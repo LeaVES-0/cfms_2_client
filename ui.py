@@ -19,10 +19,9 @@ from Windows.MainWindow import MainWindow
 RESOURCE_IMAGES = "resource/images/"
 
 
-class ShowWindows (AcrylicWindow, MainWindow, LoginWindow):
+class ShowWindows (AcrylicWindow):
     def __init__(self):
         super().__init__()
-
 
     def winSet(self):
         """所有窗口采用统一的样式,
@@ -53,74 +52,39 @@ class ShowWindows (AcrylicWindow, MainWindow, LoginWindow):
         self.move(center[0], center[1])
 
 
-    def login_ui(self):
+class LoginUI(LoginWindow, ShowWindows):
+    def __init__(self):
+        super().__init__()
         super().setup_login_ui()
-        self.winSet()
-        self.label.setScaledContents(False)
-        # super().resizeEvent()
-        pixmap = QPixmap(f"{RESOURCE_IMAGES}login_b.jpg")
-        
-        self.label.setPixmap(pixmap)
+        super().winSet()
+        self.label.setPixmap(QPixmap(f"{RESOURCE_IMAGES}login_b.jpg"))
         self.label_ground.setPixmap(QPixmap(f"{RESOURCE_IMAGES}logo.png"))
+
+    def resizeEvent(self, e):
+        self.label.setScaledContents(False)
+        super().resizeEvent(e)
+        pixmap = QPixmap(f"{RESOURCE_IMAGES}login_b.jpg").scaled(
+            self.label.size(),
+            Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+            Qt.TransformationMode.SmoothTransformation
+        )
+        self.label.setPixmap(pixmap)
+
+    def loginUI(self):
         self.show()
 
-    def main_ui(self):
+
+class MainUI(ShowWindows, MainWindow):
+    def __init__(self):
+        super().__init__()
+
+
+    def mainUI(self):
         super().setup_main_ui()
-        self.winSet()
+        super().winSet()
         """初始化父类"""
         # windows_init(self)
         # 防止导航栏挡住标题栏
         # 因为titleBar不在MainWindows.py,所以在此处设置hBoxLayout的边距
         self.hBoxLayout.setContentsMargins(0, self.titleBar.height(), 0, 0)
         self.show()
-
-# class RunLoginWindow(AcrylicWindow, LoginWindow):
-#     """运行登陆窗口
-#     与素材有关的设置再次统一配置，
-#     方便管理"""
-
-#     def __init__(self):
-#         """初始化父类"""
-#         super().__init__()
-#         # windows_init(self)
-
-#     def resizeEvent(self, e):
-#         self.label.setScaledContents(False)
-#         super().resizeEvent(e)
-#         pixmap = QPixmap(f"{RESOURCE_IMAGES}login_b.jpg").scaled(
-#             self.label.size(),
-#             Qt.AspectRatioMode.KeepAspectRatioByExpanding,
-#             Qt.TransformationMode.SmoothTransformation
-#         )
-#         self.label.setPixmap(pixmap)
-#         self.label_ground.setPixmap(QPixmap(f"{RESOURCE_IMAGES}logo.png"))
-
-
-# class RunMainWindow(AcrylicWindow, FramelessWindow, MainWindow):
-#     """运行主窗口"""
-#     def __init__(self):
-#         """初始化父类"""
-#         # windows_init(self)
-#         # 防止导航栏挡住标题栏
-#         # 因为titleBar不在MainWindows.py,所以在此处设置hBoxLayout的边距
-#         self.hBoxLayout.setContentsMargins(0, self.titleBar.height(), 0, 0)
-
-
-def main():
-    """创建Qt应用程序实例"""
-    app = QApplication(sys.argv)
-    # Internationalization
-    translator = FluentTranslator(QLocale())
-    app.installTranslator(translator)
-    # 创建登入窗口实例
-    login_w = ShowWindows()
-    login_w.login_ui()
-    # 创建主窗口实例
-    main_w = ShowWindows()
-    main_w.main_ui()
-    # 启动Qt应用程序
-    app.exec()
-
-
-if __name__ == '__main__':
-    main()

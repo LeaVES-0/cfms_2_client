@@ -9,12 +9,12 @@ import re
 
 exampleList = []
 
-class Search:
-    """搜索功能"""
-    def __init__(self,fileList):
-        self.file = fileList
-    def mainloop(self):
-        for i in self.file:
+# class Search:
+#     """搜索功能"""
+#     def __init__(self,fileList):
+#         self.file = fileList
+#     def mainloop(self):
+#         for i in self.file:
             
             
             
