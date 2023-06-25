@@ -37,12 +37,11 @@ class MainWindow:
             parentRouteKey=parent.objectName() if parent else None
         )
 
-    def setup_ui(self, window_form):
-        """window_form是供ui.py统一设置使用的实参"""
-        window_form.setObjectName("Form")
-        self.hBoxLayout = QHBoxLayout(window_form)
+    def setup_main_ui(self):
+        self.setObjectName("Form")
+        self.hBoxLayout = QHBoxLayout(self)
         self.navigationInterface = NavigationInterface(self, showMenuButton=True)
-        self.stackWidget = QStackedWidget(window_form)
+        self.stackWidget = QStackedWidget(self)
         # 创建导航栏组件
         self.mainInterface = Widget("精致的界面")
         self.settingInterface = Widget("设置")

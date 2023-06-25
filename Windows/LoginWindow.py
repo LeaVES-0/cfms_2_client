@@ -9,18 +9,17 @@ from qfluentwidgets import CheckBox, LineEdit, PrimaryPushButton
 
 
 class LoginWindow:
-    def setup_ui(self, window_form):
+    def setup_login_ui(self):
         # 主窗口
-        window_form.setObjectName("Form")
         # window_form.resize(1250, 809)
         # window_form.setMinimumSize(QtCore.QSize(700, 500))
         #
-        self.horizontalLayout = QtWidgets.QHBoxLayout(window_form)
+        self.horizontalLayout = QtWidgets.QHBoxLayout(self)
         self.horizontalLayout.setContentsMargins(0, 0, 0, 0)
         self.horizontalLayout.setSpacing(0)
         self.horizontalLayout.setObjectName("horizontalLayout")
         #
-        self.widget = QtWidgets.QWidget(parent=window_form)
+        self.widget = QtWidgets.QWidget(parent=self)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Preferred,
                                            QtWidgets.QSizePolicy.Policy.Preferred)
         sizePolicy.setHorizontalStretch(0)
@@ -152,7 +151,7 @@ class LoginWindow:
         self.verticalLayout_2.addItem(spacerItem5)
         # 背景图
         self.horizontalLayout.addWidget(self.widget)
-        self.label = QtWidgets.QLabel(parent=window_form)
+        self.label = QtWidgets.QLabel(parent=self)
         self.label.setText("")
         # self.label.setPixmap(QtGui.QPixmap("resource/images/login_b.jpg"))
         # self.label.setScaledContents(True)
@@ -165,8 +164,8 @@ class LoginWindow:
         self.horizontalLayout.addWidget(self.label)
         # self.label.setPixmap(backGroundPicture)
         #
-        self.re_translate_ui(window_form)
-        QtCore.QMetaObject.connectSlotsByName(window_form)
+        self.re_translate_ui(self)
+        QtCore.QMetaObject.connectSlotsByName(self)
 
     def re_translate_ui(self, Form):
         """登入部分
