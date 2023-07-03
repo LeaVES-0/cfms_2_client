@@ -7,11 +7,11 @@
 
 import sys
 
-from PyQt6.QtCore import Qt, QLocale, QSize
+from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QIcon, QPixmap
 from PyQt6.QtWidgets import QApplication
-from qfluentwidgets import setThemeColor, FluentTranslator
-from qframelesswindow import StandardTitleBar, AcrylicWindow, FramelessWindow
+from qfluentwidgets import setThemeColor
+from qframelesswindow import StandardTitleBar, AcrylicWindow
 
 from Windows.LoginWindow import LoginWindow
 from Windows.MainWindow import MainWindow

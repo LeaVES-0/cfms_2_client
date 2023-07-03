@@ -7,20 +7,13 @@
 
 import sys
 
-from PyQt6.QtCore import Qt, QLocale, QSize
-from PyQt6.QtGui import QIcon, QPixmap
+from PyQt6.QtCore import QLocale
 from PyQt6.QtWidgets import QApplication
-from qfluentwidgets import setThemeColor, FluentTranslator
-from qframelesswindow import StandardTitleBar, AcrylicWindow, FramelessWindow
-
-from Windows.LoginWindow import LoginWindow
-from Windows.MainWindow import MainWindow
+from qfluentwidgets import FluentTranslator
 from ui import LoginUI, MainUI
 
 def main():
-    """创建Qt应用程序实例"""
     app = QApplication(sys.argv)
-    # Internationalization
     translator = FluentTranslator(QLocale())
     app.installTranslator(translator)
     # 创建登入窗口实例
