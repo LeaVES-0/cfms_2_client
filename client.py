@@ -6,12 +6,13 @@
 # coding: utf-8
 
 import socket
+from typing import Any
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_OAEP, AES
 from Crypto.Util.Padding import pad, unpad
 from Crypto.Random import get_random_bytes
 from threading import Thread
-import hashlib, json, time, os, sys, pathlib
+import hashlib, json, time, os, sys, pathlib, asyncio
 
 DEFAULT_PORT = 5103
 DEFAULT_PEM_DIR = "saved_certs"
@@ -51,18 +52,16 @@ class Client():
         return decrypted_data.decode()
     
     def recvall(self):
-        def recvMainloop():    
-            while True:
-                while True:
-                    primaryData = b""
-                    more = self.client.recv(1024)
-                    primaryData += more
-                    if len(more) < 1024:
-                        break
-                data = json.loads(self.AES_decrypt(primaryData))
-                print(data)
-                del data, more, primaryData
-        Thread(target=recvMainloop, name="recvMainloop").start()
+        asyncio.run(self.recvMainloop())
+
+    async def recvMainloop(self):    
+        while True:
+            primaryData, more = b"", b""
+            more = await self.client.recv(1024)
+            primaryData += more
+            if len(more) < 1024:
+                self.data = json.loads(self.AES_decrypt(primaryData))
+                continue
 
     def connectServer(self):
         """连接到服务器"""
