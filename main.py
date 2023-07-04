@@ -18,6 +18,7 @@ def main():
     app.installTranslator(translator)
     # 创建登入窗口实例
     login_w = LoginUI()
+    login_w.setLoginState(0)
     login_w.loginUI()
     # 创建主窗口实例
     main_w = MainUI()

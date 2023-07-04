@@ -38,7 +38,6 @@ class MainWindow:
         )
 
     def setup_main_ui(self):
-        self.setObjectName("Form")
         self.hBoxLayout = QHBoxLayout(self)
         self.navigationInterface = NavigationInterface(self, showMenuButton=True)
         self.stackWidget = QStackedWidget(self)

@@ -7,10 +7,10 @@
 
 import sys
 
-from PyQt6.QtCore import Qt, QSize
+from PyQt6.QtCore import Qt, QSize, qSetFieldWidth
 from PyQt6.QtGui import QIcon, QPixmap
-from PyQt6.QtWidgets import QApplication
-from qfluentwidgets import setThemeColor
+from PyQt6.QtWidgets import *
+from qfluentwidgets import *
 from qframelesswindow import StandardTitleBar, AcrylicWindow
 
 from Windows.LoginWindow import LoginWindow
@@ -18,6 +18,29 @@ from Windows.MainWindow import MainWindow
 
 RESOURCE_IMAGES = "resource/images/"
 
+def InfoBarDisplay(objectName, type:str="info",
+                        infomation:str="null",
+                          title:str="Null",
+                            whereis:str="TOP",
+                            durationTime:int=2000):
+    infoType = {"info":InfoBar.success,
+                "warn":InfoBar.warning,
+                "error":InfoBar.error}
+    position = {"TOP":InfoBarPosition.TOP,
+                "TOP_LEFT":InfoBarPosition.TOP_LEFT,
+                "TOP_RIGHT":InfoBarPosition.TOP_RIGHT,
+                "BUTTON":InfoBarPosition.BOTTOM,
+                "BUTTON_LEFT":InfoBarPosition.BOTTOM_LEFT,
+                "BUTTON_RIGHT":InfoBarPosition.BOTTOM.BOTTOM_RIGHT}
+
+    infoType[type](
+        title,
+        infomation,
+        isClosable=True,
+        position=position[whereis],
+        duration=durationTime,
+        parent=objectName
+    )
 
 class ShowWindows (AcrylicWindow):
     def __init__(self):
@@ -55,10 +78,38 @@ class ShowWindows (AcrylicWindow):
 class LoginUI(LoginWindow, ShowWindows):
     def __init__(self):
         super().__init__()
-        super().setup_login_ui()
-        super().winSet()
+        self.setup_login_ui()
+        self.winSet()
         self.label.setPixmap(QPixmap(f"{RESOURCE_IMAGES}login_b.jpg"))
-        self.label_ground.setPixmap(QPixmap(f"{RESOURCE_IMAGES}logo.png"))
+        self.label_head_icon.setPixmap(QPixmap(f"{RESOURCE_IMAGES}logo.png"))
+        self.setFixedSize(self.width(), self.height())
+        self.setLoginState(0)
+
+        self.back_Button.clicked.connect(lambda: self.setLoginState(0))
+        self.link_server_button.clicked.connect(lambda: InfoBarDisplay(self))
+
+    def __setQVBoxLayoutUserVisible(self, value:bool=False):
+        """显示/隐藏账户密码栏"""
+        for i in range(self.QVBoxLayout_2.count()):
+            if not isinstance(self.QVBoxLayout_2.itemAt(i),(QSpacerItem)):
+                item = self.QVBoxLayout_2.itemAt(i)
+                item.widget().setVisible(value)
+    
+    def __setGridLayoutServerVisible(self, value:bool=True):
+        for i in range(self.GridLayoutFServer.count()):
+            if not isinstance(self.GridLayoutFServer.itemAt(i),(QSpacerItem)):
+                item = self.GridLayoutFServer.itemAt(i)
+                item.widget().setVisible(value)
+
+    def setLoginState(self, state:int=0):
+        if state == 1: 
+            self.__setQVBoxLayoutUserVisible(True)
+            self.__setGridLayoutServerVisible(False)
+        elif state == 0:
+            self.__setQVBoxLayoutUserVisible(False)
+            self.__setGridLayoutServerVisible(True)
+        else:
+            raise TypeError
 
     def resizeEvent(self, e):
         self.label.setScaledContents(False)
@@ -80,8 +131,8 @@ class MainUI(ShowWindows, MainWindow):
 
 
     def mainUI(self):
-        super().setup_main_ui()
-        super().winSet()
+        self.setup_main_ui()
+        self.winSet()
         """初始化父类"""
         # windows_init(self)
         # 防止导航栏挡住标题栏
