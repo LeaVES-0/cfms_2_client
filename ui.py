@@ -33,11 +33,11 @@ def InfoBarDisplay(objectName, type:str="info",
                 "BUTTON_LEFT":InfoBarPosition.BOTTOM_LEFT,
                 "BUTTON_RIGHT":InfoBarPosition.BOTTOM.BOTTOM_RIGHT}
 
-    infoType[type](
+    infoType[type.lower()](
         title,
         infomation,
         isClosable=True,
-        position=position[whereis],
+        position=position[whereis.upper()],
         duration=durationTime,
         parent=objectName
     )
@@ -85,9 +85,6 @@ class LoginUI(LoginWindow, ShowWindows):
         self.setFixedSize(self.width(), self.height())
         self.setLoginState(0)
 
-        self.back_Button.clicked.connect(lambda: self.setLoginState(0))
-        self.link_server_button.clicked.connect(lambda: InfoBarDisplay(self))
-
     def __setQVBoxLayoutUserVisible(self, value:bool=False):
         """显示/隐藏账户密码栏"""
         for i in range(self.QVBoxLayout_2.count()):
@@ -102,6 +99,7 @@ class LoginUI(LoginWindow, ShowWindows):
                 item.widget().setVisible(value)
 
     def setLoginState(self, state:int=0):
+        """为1时显示用户登陆界面, 为0时显示服务器连接界面"""
         if state == 1: 
             self.__setQVBoxLayoutUserVisible(True)
             self.__setGridLayoutServerVisible(False)
@@ -111,6 +109,16 @@ class LoginUI(LoginWindow, ShowWindows):
         else:
             raise TypeError
 
+    def getServerAddess(self):
+        hostname = self.serverAdLE.text()
+        port = self.serverPortLE.text()
+        return (hostname, port)
+    
+    def getUserAccount(self):
+        username = self.userNameLE.text()
+        password = self.userPasswordLE.text()
+        return (username, password)
+    
     def resizeEvent(self, e):
         self.label.setScaledContents(False)
         super().resizeEvent(e)
