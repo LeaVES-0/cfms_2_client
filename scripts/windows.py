@@ -13,8 +13,8 @@ from PyQt6.QtWidgets import *
 from qfluentwidgets import *
 from qframelesswindow import StandardTitleBar, FramelessWindow
 
-from windows.LoginWindow import LoginWindow
-from windows.MainWindow import MainWindow
+from interface.LoginWindow import LoginWindow
+from interface.MainWindow import MainWindow
 
 RESOURCE_IMAGES = "resource/images/"
 DEFAULT_THEME_COLOUR = "#28afe9"
@@ -117,14 +117,7 @@ class ShowWindows(FramelessWindow):
         self.resize(1000, 650)
         self.windowEffect.setMicaEffect(self.winId())
         self.setMinimumSize(QSize(700, 500))
-        # 标题栏风格设置
-        style = """QLabel{
-            background: transparent;
-            font: 13px 'Segoe UI';
-            color: black;padding: 0 4px
-        }
-        """
-        self.titleBar.titleLabel.setStyleSheet(style)
+
         # 移动窗口的位置，让它位于屏幕正中间
         desktop = QApplication.screens()[0].availableGeometry()
         width, height = desktop.width(), desktop.height()

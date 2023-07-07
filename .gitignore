@@ -2,3 +2,8 @@
 /.idea
 /__pycache__
 *.log
+/interface/__pycache__
+/scripts/__pycache__
+/resource/__pycache__
+/resource/i18n/__pycache__
+*.pyc

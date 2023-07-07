@@ -11,9 +11,8 @@ from PyQt6.QtCore import QLocale, QThread, pyqtSignal
 from PyQt6.QtWidgets import QApplication
 from qfluentwidgets import FluentTranslator, Theme
 
-from ui import LoginUI, MainUI, MessageDisplay, InfoBarDisplay
-from function.commonfunc import writePerclip
-from client import Client
+from scripts.windows import LoginUI, MainUI, MessageDisplay, InfoBarDisplay
+from scripts.client import Client
 
 linkState = None
 
@@ -110,7 +109,6 @@ class MainClient():
             if state_token[0]["code"] == 0:
                 # 同步主题
                 if self.login_w.theme == Theme.DARK:
-                    pass
                     self.main_w.setThemeState()
                     self.main_w.setThemeState()
                 self.userToken = state_token[0]["token"]

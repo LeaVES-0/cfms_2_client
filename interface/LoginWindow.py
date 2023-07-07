@@ -6,7 +6,7 @@
 
 from PyQt6 import QtCore, QtWidgets
 from qfluentwidgets import *
-from client import DEFAULT_PORT
+from scripts.client import DEFAULT_PORT
 from resource.i18n.CN import *
 
 class LoginWindow:
