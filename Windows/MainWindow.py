@@ -20,8 +20,6 @@ class Widget(QFrame):
         self.hBoxLayout.addWidget(self.label, 1, Qt.AlignmentFlag.AlignCenter)
         self.setObjectName(text.replace(' ', '-'))
 
-
-# class MainWindow(FramelessWindow):
 class MainWindow:
     """主窗口"""
     def addSubInterface(self, interface, icon, text: str, position=NavigationItemPosition.TOP, parent=None):

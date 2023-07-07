@@ -67,18 +67,19 @@ class Client():
 
     def connectServer(self):
         """连接到服务器"""
+        self.client.settimeout(7)
         self.client.connect((self.host, self.port))
         self.client.sendall("hello".encode())
         self.client.recv(1024)
         self.client.sendall("enableEncryption".encode())
-        public_key = json.loads(self.client.recv(1024).decode(encoding="utf-8"))['public_key']
-        if public_key == (localkey:=self.r_pemfile()): 
-            print(f"The public key is \n {public_key}")
+        self.public_key = json.loads(self.client.recv(1024).decode(encoding="utf-8"))['public_key']
+        if self.public_key == (localkey:=self.r_pemfile()): 
+            print(f"The public key is \n {self.public_key}")
         else:
-            print(f"The public key of the server is \n {public_key}. \n But your public key is \n {localkey}.")
-            self.w_pemfile(pem = public_key)
+            print(f"The public key of the server is \n {self.public_key}. \n But your public key is \n {localkey}.")
+            self.w_pemfile(pem = self.public_key)
 
-        RSA_public_key = RSA.import_key(public_key)
+        RSA_public_key = RSA.import_key(self.public_key)
         RSA_public_cipher = PKCS1_OAEP.new(RSA_public_key)
 
         self.AEC_key = get_random_bytes(32) # 生成对称加密密钥
@@ -95,7 +96,6 @@ class Client():
         """用户登陆"""
         sha256_obj = hashlib.sha256()
         sha256_obj.update(password.encode())
-
         request_data = {
             "version": 1,
             "request": "login",
@@ -105,9 +105,11 @@ class Client():
                 },
             "token": ""
             }
-        
         self.client.send(self.AES_encrypt(json.dumps(request_data)))
         self.state_token = self.recv_data
+
+    def close(self):
+        self.client.close()
     recv_data = property(recvall,)
 
 if __name__ == "__main__":

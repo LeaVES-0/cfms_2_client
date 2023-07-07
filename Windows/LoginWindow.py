@@ -51,18 +51,22 @@ class LoginWindow:
         # 用户名L
         self.label_5 = QtWidgets.QLabel(parent=self.widget)
         self.label_5.setObjectName("label_5")
+        self.QVBoxLayout_2.addWidget(self.label_5)
         # 用户名E
         self.userNameLE = LineEdit(parent=self.widget)
         self.userNameLE.setClearButtonEnabled(True)
         self.userNameLE.setObjectName("userNameLE")
+        self.QVBoxLayout_2.addWidget(self.userNameLE)
         # 密码L
         self.label_6 = QtWidgets.QLabel(parent=self.widget)
         self.label_6.setObjectName("label_6")
-        # 密码
+        self.QVBoxLayout_2.addWidget(self.label_6)
+        # 密码E
         self.userPasswordLE = LineEdit(parent=self.widget)
         self.userPasswordLE.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
         self.userPasswordLE.setClearButtonEnabled(True)
         self.userPasswordLE.setObjectName("userPasswordLE")
+        self.QVBoxLayout_2.addWidget(self.userPasswordLE)
         # spacerItem
         spacerItem3 = QtWidgets.QSpacerItem(20, 5, QtWidgets.QSizePolicy.Policy.Minimum,
                                             QtWidgets.QSizePolicy.Policy.Fixed)
@@ -71,6 +75,7 @@ class LoginWindow:
         self.checkBox = CheckBox(parent=self.widget)
         self.checkBox.setChecked(True)
         self.checkBox.setObjectName("checkBox")
+        self.QVBoxLayout_2.addWidget(self.checkBox, 0, QtCore.Qt.AlignmentFlag.AlignHCenter)
         # spacerItem
         spacerItem4 = QtWidgets.QSpacerItem(20, 5, QtWidgets.QSizePolicy.Policy.Minimum,
                                             QtWidgets.QSizePolicy.Policy.Fixed)
@@ -78,17 +83,12 @@ class LoginWindow:
         # 登入按键
         self.login_Button = PrimaryPushButton(parent=self.widget)
         self.login_Button.setObjectName("login_Button")
+        self.QVBoxLayout_2.addWidget(self.login_Button)
         spacerItem5 = QtWidgets.QSpacerItem(20, 5, QtWidgets.QSizePolicy.Policy.Minimum,
                                             QtWidgets.QSizePolicy.Policy.Fixed)
         self.QVBoxLayout_2.addItem(spacerItem5)
         self.back_Button = PrimaryPushButton(parent=self.widget)
         self.back_Button.setObjectName("back_Button")
-        self.QVBoxLayout_2.addWidget(self.label_5)
-        self.QVBoxLayout_2.addWidget(self.userNameLE)
-        self.QVBoxLayout_2.addWidget(self.label_6)
-        self.QVBoxLayout_2.addWidget(self.userPasswordLE)
-        self.QVBoxLayout_2.addWidget(self.checkBox, 0, QtCore.Qt.AlignmentFlag.AlignHCenter)
-        self.QVBoxLayout_2.addWidget(self.login_Button)
         self.QVBoxLayout_2.addWidget(self.back_Button)
 
     def __initVerticalLayout_2(self):
@@ -135,6 +135,19 @@ class LoginWindow:
         spacerItem2 = QtWidgets.QSpacerItem(20, 15, QtWidgets.QSizePolicy.Policy.Minimum,
                                             QtWidgets.QSizePolicy.Policy.Fixed)
         self.verticalLayout_2.addItem(spacerItem2)
+
+        self.loadProgressBar = IndeterminateProgressBar()
+        self.verticalLayout_2.addWidget(self.loadProgressBar)
+        self.loadProgressBar.setVisible(False)
+
+        self.connectedServerLable = PushButton()
+        self.verticalLayout_2.addWidget(self.connectedServerLable)
+        self.connectedServerLable.setVisible(False)
+        self.connectedServerLable.setText("")
+
+        spacerItem3 = QtWidgets.QSpacerItem(20, 15, QtWidgets.QSizePolicy.Policy.Minimum,
+                                            QtWidgets.QSizePolicy.Policy.Fixed)
+        self.verticalLayout_2.addItem(spacerItem3)
 
         self.__initGridLayoutServer()
         self.verticalLayout_2.addLayout(self.GridLayoutFServer)
@@ -194,5 +207,5 @@ class LoginWindow:
         self.checkBox.setText(f"{REMEMBER_PASSWORD}")
         self.login_Button.setText(f"{LOGIN_TEXT}")
         self.login_Button.setToolTip(f"{LOGIN_BUTTON_TIP}")
-        self.back_Button.setText("Back")
+        self.back_Button.setText("断开连接")
         self.link_server_button.setText("连接到服务器")
