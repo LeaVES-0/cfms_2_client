@@ -195,7 +195,6 @@ class LoginWindow:
     def re_set_text(self):
         """登入部分
         统一设置组件的内容"""
-        self.label_title.setText(f"{LOGIN_TITLE}")
         self.serverAdLE.setPlaceholderText("example.com")
         self.label_3.setText(f"{ENTER_ADDRESS}")
         self.serverPortLE.setText(f"{DEFAULT_PORT}")

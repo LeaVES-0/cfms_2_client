@@ -161,9 +161,11 @@ class LoginUI(LoginWindow, ShowWindows):
     def setLoginState(self, state:int=0):
         """为1时显示用户登陆界面, 为0时显示服务器连接界面"""
         if state == 1: 
+            self.label_title.setText("Login")
             self.__setQVBoxLayoutUserVisible(True)
             self.__setGridLayoutServerVisible(False)
         elif state == 0:
+            self.label_title.setText("Link Server")
             self.__setQVBoxLayoutUserVisible(False)
             self.__setGridLayoutServerVisible(True)
         else:

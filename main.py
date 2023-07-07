@@ -5,7 +5,7 @@
 # @FileName: Main.py
 # coding: utf-8
 
-import sys, socket
+import sys
 
 from PyQt6.QtCore import QLocale, QThread, pyqtSignal
 from PyQt6.QtWidgets import QApplication
@@ -105,20 +105,21 @@ class MainClient():
             self.login_w.loadProgressBar.setVisible(False)
 
     def __loginUI_checkLoginState(self, state_token):
-            if state_token[0]:
-                if state_token[0]["code"] == 0:
-                    # 同步主题
-                    if self.login_w.theme == Theme.DARK:
-                        pass
-                        self.main_w.setThemeState()
-                        self.main_w.setThemeState()
-                    self.userToken = state_token[0]["token"]
-                    self.login_w.close()
-                    self.main_w.mainUI()
-                    InfoBarDisplay(self.main_w, type="info", whereis="TOP", title="登陆成功!", infomation="")
-                elif state_token[0]["code"] == 401:
-                    msg = state_token[0]["msg"]
-                    InfoBarDisplay(self.login_w, type="warn", whereis="TOP_LEFT", title="登陆失败。", infomation=f"密码错误:{msg}")                    
+        """检测登陆状态"""
+        if state_token[0]:
+            if state_token[0]["code"] == 0:
+                # 同步主题
+                if self.login_w.theme == Theme.DARK:
+                    pass
+                    self.main_w.setThemeState()
+                    self.main_w.setThemeState()
+                self.userToken = state_token[0]["token"]
+                self.login_w.close()
+                self.main_w.mainUI()
+                InfoBarDisplay(self.main_w, type="info", whereis="TOP", title="登录成功!", infomation="")
+            elif state_token[0]["code"] == 401:
+                msg = state_token[0]["msg"]
+                InfoBarDisplay(self.login_w, type="warn", whereis="TOP_LEFT", title="登陆失败。", infomation=f"密码错误:{msg}")                    
             # InfoBarDisplay(self.login_w, type="warn", whereis="TOP_LEFT", title="登陆超时", infomation="")
             elif not state_token[0]:
                 InfoBarDisplay(self.main_w, type="error", whereis="TOP_LEFT", title="错误", infomation=f"{state_token[1]!s}")
