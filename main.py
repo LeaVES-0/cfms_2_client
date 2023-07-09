@@ -147,6 +147,7 @@ class MainClient():
     def run(self):
         self.login_w.loginUI()
         # start Qt app
+        self.main_w.mainUI()
         self.QtApp.exec()
     
 if __name__ == '__main__':

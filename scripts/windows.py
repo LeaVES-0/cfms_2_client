@@ -70,41 +70,19 @@ class LeaVESTitleBar(StandardTitleBar):
         elif titleBarTheme.upper() == "LIGHT":
             self.titleLabel.setStyleSheet("QLabel{ color: black}")
 
+    def useBackGround(self):
+        desktop = QApplication.screens()[0].availableGeometry()
+        width, height = desktop.width(), desktop.height()
+        self.backgroundLable = QLabel(parent=self)
+        self.backgroundLable.setGeometry(0, 0, width, height)
+        self.backgroundLable.lower()
+
 class ShowWindows(FramelessWindow):
     def __init__(self):
-        super().__init__()
-        self.theme = Theme.LIGHT
-
-    def setThemeState(self):
-        """切换主题模式"""
-        if isDarkTheme():
-            self.theme = Theme.LIGHT
-            styleSheet = "background-color: white;"
-            labelStyle = """QLabel{
-            font: 13px 'Microsoft YaHei';
-            color: black
-            }"""
-            # titlebar theme
-            self.titleBarObj.setLeaVESTitBarTheme(titleBarTheme="LIGHT")
-        elif not isDarkTheme():
-            self.theme = Theme.DARK
-            styleSheet = "background-color: #333333;"
-            labelStyle = """QLabel{
-            font: 13px 'Microsoft YaHei';
-            font-weight: bold;
-            color: white
-            }"""
-            self.titleBarObj.setLeaVESTitBarTheme(titleBarTheme="DARK")
-        # winodow background
-        self.setStyleSheet(styleSheet)
-        # label theme
-        self.setLabelTheme(labelStyle)
-        # widgets theme
-        setTheme(self.theme)
-
-    def winSet(self):
         """所有窗口采用统一的样式,
         统一设置,避免重复"""
+        super().__init__()
+        self.theme = Theme.LIGHT
         # 主题色
         setThemeColor(F'{DEFAULT_THEME_COLOUR}')
         # 标题栏
@@ -116,27 +94,55 @@ class ShowWindows(FramelessWindow):
         # 大小
         self.resize(1000, 650)
         self.windowEffect.setMicaEffect(self.winId())
+        self.desktop = QApplication.screens()[0].availableGeometry()
+        width, height = self.desktop.width(), self.desktop.height()
         self.setMinimumSize(QSize(700, 500))
-
+        self.setMaximumSize(QSize(width, height))
         # 移动窗口的位置，让它位于屏幕正中间
-        desktop = QApplication.screens()[0].availableGeometry()
-        width, height = desktop.width(), desktop.height()
         center = width // 2 - self.width() // 2, height // 2 - self.height() // 2
         self.move(center[0], center[1])
 
-class LoginUI(LoginWindow, ShowWindows):
+    def setThemeState(self):
+        """切换主题模式"""
+        if isDarkTheme():
+            self.theme = Theme.LIGHT
+            interfaceTheme = "LIGHT"
+            # titlebar theme
+            self.titleBarObj.setLeaVESTitBarTheme(titleBarTheme="LIGHT")
+        elif not isDarkTheme():
+            self.theme = Theme.DARK
+            interfaceTheme = "DARK"
+            self.titleBarObj.setLeaVESTitBarTheme(titleBarTheme="DARK")
+        # label theme
+        self.setInterfaceTheme(interfaceTheme)
+        # widgets theme
+        setTheme(self.theme)
+
+class LoginUI(ShowWindows, LoginWindow):
     def __init__(self):
         super().__init__()
-        self.setup_login_ui()
-        self.winSet()
         self.label.setPixmap(QPixmap(f"{RESOURCE_IMAGES}login_b.jpg"))
         self.label_head_icon.setPixmap(QPixmap(f"{RESOURCE_IMAGES}logo.png"))
         self.titleBar.hBoxLayout.removeWidget(self.titleBar.maxBtn)
-        self.setFixedSize(self.width(), self.height())
+        # self.setFixedSize(self.width(), self.height())
         self.setLoginState(0)
 
-    def setLabelTheme(self, labelstyle):
-        self.widget.setStyleSheet(labelstyle)
+    def setInterfaceTheme(self, interfaceTheme:str="LIGHT"):
+        if interfaceTheme == "DARK":
+            styleSheet = "background-color: #333333;"
+            labelStyle = """QLabel{
+            font: 13px 'Microsoft YaHei';
+            font-weight: bold;
+            color: white
+            }"""
+        elif interfaceTheme == "LIGHT":
+            styleSheet = "background-color: white;"
+            labelStyle = """QLabel{
+            font: 13px 'Microsoft YaHei';
+            color: black
+            }"""
+        self.setStyleSheet(styleSheet)
+        self.widget.setStyleSheet(labelStyle)
 
     def __setQVBoxLayoutUserVisible(self, value:bool=False):
         """显示/隐藏账户密码栏"""
@@ -165,13 +171,13 @@ class LoginUI(LoginWindow, ShowWindows):
             raise TypeError
 
     def getServerAddess(self):
-        hostname = self.serverAdLE.text()
-        port = self.serverPortLE.text()
+        hostname = self.serverAdLE.text().strip()
+        port = self.serverPortLE.text().strip()
         return (hostname, port)
     
     def getUserAccount(self):
-        username = self.userNameLE.text()
-        password = self.userPasswordLE.text()
+        username = self.userNameLE.text().strip()
+        password = self.userPasswordLE.text().strip()
         return (username, password)
     
     def resizeEvent(self, e):
@@ -187,17 +193,16 @@ class LoginUI(LoginWindow, ShowWindows):
     def loginUI(self):
         self.show()
 
-class MainUI(MainWindow, ShowWindows):
+class MainUI(ShowWindows, MainWindow):
     def __init__(self):
         super().__init__()
-        self.setup_main_ui()
-        self.winSet()
+        self.titleBarObj.useBackGround()
         # 防止导航栏挡住标题栏
         # 因为titleBar不在MainWindows.py,所以在此处设置hBoxLayout的边距
         self.hBoxLayout.setContentsMargins(0, self.titleBar.height(), 0, 0)
 
-    def setLabelTheme(self, labelstyle):
-        self.stackWidget.setStyleSheet(labelstyle)
-
+    def setInterfaceTheme(self, interfaceTheme:str="LIGHT"):
+        styleSheet = "background-color: #333333;" if interfaceTheme == "DARK" else "background-color: white;"
+        self.titleBarObj.setStyleSheet(styleSheet)
     def mainUI(self):
         self.show()

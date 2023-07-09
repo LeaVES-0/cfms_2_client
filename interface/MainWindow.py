@@ -9,19 +9,30 @@ from PyQt6.QtWidgets import *
 from qfluentwidgets import *
 from qfluentwidgets import FluentIcon as FIF
 
-
-class Widget(QFrame):
-    # example
-    def __init__(self, text: str, parent=None):
-        super().__init__(parent=parent)
-        self.label = QLabel(text, self)
-        self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.hBoxLayout = QHBoxLayout(self)
-        self.hBoxLayout.addWidget(self.label, 1, Qt.AlignmentFlag.AlignCenter)
-        self.setObjectName(text.replace(' ', '-'))
+from scripts.pages import HomePage
 
 class MainWindow:
     """主窗口"""
+    def __init__(self):
+        self.hBoxLayout = QHBoxLayout(self)
+        self.navigationInterface = NavigationInterface(self, showMenuButton=True)
+        self.stackWidget = QStackedWidget(self)
+        self.stackWidget.setStyleSheet("""QLabel{
+            font: 13px 'Microsoft YaHei'
+            }""")
+        # 创建导航栏组件
+        self.mainInterface = HomePage()
+        self.settingInterface = HomePage()
+        # 将导航栏目添加到hBoxLayout
+        self.hBoxLayout.setSpacing(0)
+        self.hBoxLayout.addWidget(self.navigationInterface)
+        self.hBoxLayout.addWidget(self.stackWidget)
+        self.hBoxLayout.setStretchFactor(self.stackWidget, 1)
+        # 在导航栏添加组件
+        self.navigationInterface.addSeparator()
+        self.addSubInterface(self.mainInterface, FIF.LAYOUT, "主界面", position=NavigationItemPosition.SCROLL)
+        self.addSubInterface(self.settingInterface, FIF.SETTING, "设置", position=NavigationItemPosition.BOTTOM)
+
     def addSubInterface(self, interface, icon, text: str, position=NavigationItemPosition.TOP, parent=None):
         """ 添加栏目 """
         self.stackWidget.addWidget(interface)
@@ -34,22 +45,3 @@ class MainWindow:
             tooltip=text,
             parentRouteKey=parent.objectName() if parent else None
         )
-
-    def setup_main_ui(self):
-        self.hBoxLayout = QHBoxLayout(self)
-        self.navigationInterface = NavigationInterface(self, showMenuButton=True)
-        self.stackWidget = QStackedWidget(self)
-        # 创建导航栏组件
-        self.mainInterface = Widget("精致的界面")
-        self.settingInterface = Widget("设置")
-        # 将导航栏目添加到hBoxLayout
-        self.hBoxLayout.setSpacing(0)
-        self.hBoxLayout.addWidget(self.navigationInterface)
-        self.hBoxLayout.addWidget(self.stackWidget)
-        self.hBoxLayout.setStretchFactor(self.stackWidget, 1)
-        # 在导航栏添加组件
-        self.navigationInterface.addSeparator()
-        self.addSubInterface(self.mainInterface, FIF.LAYOUT, "主界面", position=NavigationItemPosition.SCROLL)
-        self.addSubInterface(self.settingInterface, FIF.SETTING, "设置", position=NavigationItemPosition.BOTTOM)
-
-

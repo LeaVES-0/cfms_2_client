@@ -10,6 +10,37 @@ from scripts.client import DEFAULT_PORT
 from resource.i18n.CN import *
 
 class LoginWindow:
+    def __init__(self):
+        # 主窗口
+        self.horizontalLayout = QtWidgets.QHBoxLayout(self)
+        self.horizontalLayout.setContentsMargins(0, 0, 0, 0)
+        self.horizontalLayout.setSpacing(0)
+        
+        self.widget = QtWidgets.QWidget(parent=self)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Preferred,
+                                           QtWidgets.QSizePolicy.Policy.Preferred)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.widget.sizePolicy().hasHeightForWidth())
+        self.widget.setSizePolicy(sizePolicy)
+        self.widget.setMinimumSize(QtCore.QSize(360, 0))
+        self.widget.setMaximumSize(QtCore.QSize(360, 16777215))
+        self.widget.setStyleSheet(
+            """QLabel{
+            font: 13px 'Microsoft YaHei'
+            }"""
+        )
+
+        self.horizontalLayout.addWidget(self.widget)
+
+        # 背景图
+        self.label = QtWidgets.QLabel(parent=self)
+        self.label.setText("")
+        self.label.setObjectName("label")
+        self.horizontalLayout.addWidget(self.label)
+        self.__initVerticalLayout_2()
+        self.re_set_text()
+        QtCore.QMetaObject.connectSlotsByName(self)
 
     def __initGridLayoutServer(self):
         # 设置服务器连接部分
@@ -159,38 +190,6 @@ class LoginWindow:
         spacerItem5 = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Policy.Minimum,
                                             QtWidgets.QSizePolicy.Policy.Expanding)
         self.verticalLayout_2.addItem(spacerItem5)
-
-    def setup_login_ui(self):
-        # 主窗口
-        self.horizontalLayout = QtWidgets.QHBoxLayout(self)
-        self.horizontalLayout.setContentsMargins(0, 0, 0, 0)
-        self.horizontalLayout.setSpacing(0)
-        
-        self.widget = QtWidgets.QWidget(parent=self)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Preferred,
-                                           QtWidgets.QSizePolicy.Policy.Preferred)
-        sizePolicy.setHorizontalStretch(0)
-        sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self.widget.sizePolicy().hasHeightForWidth())
-        self.widget.setSizePolicy(sizePolicy)
-        self.widget.setMinimumSize(QtCore.QSize(360, 0))
-        self.widget.setMaximumSize(QtCore.QSize(360, 16777215))
-        self.widget.setStyleSheet(
-            """QLabel{
-            font: 13px 'Microsoft YaHei'
-            }"""
-        )
-
-        self.horizontalLayout.addWidget(self.widget)
-
-        # 背景图
-        self.label = QtWidgets.QLabel(parent=self)
-        self.label.setText("")
-        self.label.setObjectName("label")
-        self.horizontalLayout.addWidget(self.label)
-        self.__initVerticalLayout_2()
-        self.re_set_text()
-        QtCore.QMetaObject.connectSlotsByName(self)
 
     def re_set_text(self):
         """登入部分
