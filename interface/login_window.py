@@ -9,13 +9,14 @@ from qfluentwidgets import *
 from scripts.client import DEFAULT_PORT
 from interface.resource.i18n.CN import *
 
+
 class LoginWindow:
     def __init__(self):
         # 主窗口
         self.horizontalLayout = QtWidgets.QHBoxLayout(self)
         self.horizontalLayout.setContentsMargins(0, 0, 0, 0)
         self.horizontalLayout.setSpacing(0)
-        
+
         self.widget = QtWidgets.QWidget(parent=self)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Preferred,
                                            QtWidgets.QSizePolicy.Policy.Preferred)
@@ -71,7 +72,7 @@ class LoginWindow:
         self.GridLayoutFServer.addWidget(self.label_4, 0, 1, 1, 1)
         self.GridLayoutFServer.setColumnStretch(0, 2)
         self.GridLayoutFServer.setColumnStretch(1, 1)
-        #登陆到服务器按键
+        # 登陆到服务器按键
         self.link_server_button = PrimaryPushButton(parent=self.widget)
         self.link_server_button.setObjectName("link_server_button")
         self.GridLayoutFServer.addWidget(self.link_server_button, 3, 0, 1, 5)
@@ -129,7 +130,7 @@ class LoginWindow:
         self.verticalLayout_2.setSpacing(9)
         #
         spacerItem = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Policy.Minimum,
-                                        QtWidgets.QSizePolicy.Policy.Expanding)
+                                           QtWidgets.QSizePolicy.Policy.Expanding)
         self.verticalLayout_2.addItem(spacerItem)
 
         self.label_title = QtWidgets.QLabel(parent=self.widget)
@@ -149,9 +150,9 @@ class LoginWindow:
         # 创建一个用来放置头像的标签
         self.label_head_icon = QtWidgets.QLabel(parent=self.widget)
         # 启用设置
-        self.label_head_icon.setEnabled(True) 
+        self.label_head_icon.setEnabled(True)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Preferred,
-                                        QtWidgets.QSizePolicy.Policy.Expanding)
+                                           QtWidgets.QSizePolicy.Policy.Expanding)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.label_head_icon.sizePolicy().hasHeightForWidth())
@@ -182,7 +183,6 @@ class LoginWindow:
 
         self.__initGridLayoutServer()
         self.verticalLayout_2.addLayout(self.GridLayoutFServer)
-
 
         self.__initQVBoxLayoutUser()
         self.verticalLayout_2.addLayout(self.QVBoxLayout_2)

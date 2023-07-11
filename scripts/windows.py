@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # @Time    : 18/6/2023 下午2:12
 # @Author  : LeaVES
-# @FileName: LoginWindow.py
+# @FileName: winodws.py
 # coding: utf-8
 
 import sys
@@ -13,13 +13,13 @@ from PyQt6.QtWidgets import *
 from qfluentwidgets import *
 from qframelesswindow import StandardTitleBar, FramelessWindow
 
-from interface.LoginWindow import LoginWindow
-from interface.MainWindow import MainWindow
+from interface.loginWindow import LoginWindow
+from interface.mainWindow import MainWindow
 
-RESOURCE_IMAGES = "resource/images/"
+RESOURCE_IMAGES = "interface/resource/images/"
 DEFAULT_THEME_COLOUR = "#28afe9"
 
-def InfoBarDisplay(objectName, type:str="info",
+def InfoMessageDisplay(objectName, type:str="info",
                     infomation:str="null",
                     title:str="Null",
                     whereis:str="TOP",
@@ -58,7 +58,7 @@ class LeaVESTitleBar(StandardTitleBar):
     def __init__(self, parent):
         super(LeaVESTitleBar, self).__init__(parent=parent)
         self.titleLabel.setStyleSheet("QLabel{ color: black}")
-        spacerItem = QSpacerItem(220, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
+        spacerItem = QSpacerItem(40, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
         self.titlebarBtn = ToolButton(FluentIcon.CONSTRACT,parent = self)
         self.hBoxLayout.insertItem(3,spacerItem)
         self.hBoxLayout.insertWidget(4, self.titlebarBtn, 0, Qt.AlignmentFlag.AlignRight)
@@ -89,7 +89,7 @@ class ShowWindows(FramelessWindow):
         self.titleBarObj = LeaVESTitleBar(parent=self)
         self.setTitleBar(self.titleBarObj)
         self.titleBar.raise_()
-        self.setWindowTitle('sfms__2.0')
+        self.setWindowTitle('cfms__2.0')
         self.setWindowIcon(QIcon(f"{RESOURCE_IMAGES}logo.png"))
         # 大小
         self.resize(1000, 650)

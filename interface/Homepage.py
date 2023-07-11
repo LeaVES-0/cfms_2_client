@@ -1,3 +1,10 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @Time    : 18/6/2023 下午2:12
+# @Author  : LeaVES
+# @FileName: Homepage.py
+# coding: utf-8
+
 from PyQt6 import QtCore, QtGui, QtWidgets
 from qfluentwidgets import *
 from qfluentwidgets.components.widgets.acrylic_label import AcrylicLabel

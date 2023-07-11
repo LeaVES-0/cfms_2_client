@@ -1,15 +1,15 @@
 # -*- coding: utf-8 -*-
 # @Time    : 18/6/2023 下午2:12
 # @Author  : LeaVES
-# @FileName: MainWinodw.py
+# @FileName: MainWindow.py
 # coding: utf-8
 
-from PyQt6.QtCore import *
 from PyQt6.QtWidgets import *
 from qfluentwidgets import *
 from qfluentwidgets import FluentIcon as FIF
 
 from scripts.pages import HomePage
+
 
 class MainWindow:
     """主窗口"""

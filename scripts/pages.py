@@ -11,9 +11,9 @@ from PyQt6.QtWidgets import *
 from qfluentwidgets import *
 from qfluentwidgets.components.widgets.acrylic_label import AcrylicLabel
 
-from interface.Homepage import PrimeryHomePage
+from interface.homepage import PrimeryHomePage
 
-RESOURCE_IMAGES = "resource/images/"
+RESOURCE_IMAGES = "interface/resource/images/"
 
 class ShowPages(QWidget):
     def __init__(self):
