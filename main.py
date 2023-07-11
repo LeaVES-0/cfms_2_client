@@ -7,9 +7,11 @@
 
 from controller.cfms_main import MainClient
 
+
 def main():
-        ClientObject = MainClient()
-        ClientObject.run()
+    client = MainClient()
+    client.run()
+
 
 if __name__ == '__main__':
     main()

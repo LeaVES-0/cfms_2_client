@@ -5,69 +5,77 @@
 # @FileName: winodws.py
 # coding: utf-8
 
-import sys
-
-from PyQt6.QtCore import Qt, QSize, qSetFieldWidth
+from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QIcon, QPixmap
 from PyQt6.QtWidgets import *
 from qfluentwidgets import *
 from qframelesswindow import StandardTitleBar, FramelessWindow
 
-from interface.loginWindow import LoginWindow
-from interface.mainWindow import MainWindow
+from interface.login_window import LoginWindow
+from interface.main_window import MainWindow
 
 RESOURCE_IMAGES = "interface/resource/images/"
 DEFAULT_THEME_COLOUR = "#28afe9"
 
-def InfoMessageDisplay(objectName, type:str="info",
-                    infomation:str="null",
-                    title:str="Null",
-                    whereis:str="TOP",
-                    durationTime:int=2000):
-    infoType = {"info":InfoBar.success,
-                "warn":InfoBar.warning,
-                "error":InfoBar.error}
-    position = {"TOP":InfoBarPosition.TOP,
-                "TOP_LEFT":InfoBarPosition.TOP_LEFT,
-                "TOP_RIGHT":InfoBarPosition.TOP_RIGHT,
-                "BUTTON":InfoBarPosition.BOTTOM,
-                "BUTTON_LEFT":InfoBarPosition.BOTTOM_LEFT,
-                "BUTTON_RIGHT":InfoBarPosition.BOTTOM.BOTTOM_RIGHT}
+
+def InfoMessageDisplay(object_name, type: str = "info",
+                       infomation: str = "null",
+                       title: str = "Null",
+                       whereis: str = "TOP",
+                       duration_time: int = 2000):
+    infoType = {"info": InfoBar.success,
+                "warn": InfoBar.warning,
+                "error": InfoBar.error}
+    position = {"TOP": InfoBarPosition.TOP,
+                "TOP_LEFT": InfoBarPosition.TOP_LEFT,
+                "TOP_RIGHT": InfoBarPosition.TOP_RIGHT,
+                "BUTTON": InfoBarPosition.BOTTOM,
+                "BUTTON_LEFT": InfoBarPosition.BOTTOM_LEFT,
+                "BUTTON_RIGHT": InfoBarPosition.BOTTOM.BOTTOM_RIGHT}
 
     infoType[type.lower()](
         title,
         infomation,
         isClosable=True,
         position=position[whereis.upper()],
-        duration=durationTime,
-        parent=objectName
+        duration=duration_time,
+        parent=object_name
     )
+
 
 class MessageDisplay(MessageDialog):
     """重写message_dialog控件"""
-    def __init__(self, title: str, content: str, parent, btndisplay:tuple=(True, True), btnText: tuple=("OK","Cancel")):
+
+    def __init__(self, title: str, content: str, parent, btndisplay: tuple = (True, True),
+                 btn_text: tuple = ("OK", "Cancel")):
         super(MessageDisplay, self).__init__(title=title, content=content, parent=parent)
         self.contentLabel.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        if btndisplay[0]: self.yesButton.setText(f"{btnText[0]}")
-        else: self.yesButton.setVisible(False)
-        if btndisplay[1]: self.cancelButton.setText(f"{btnText[1]}")
-        else: self.cancelButton.setVisible(False)
- 
+        if btndisplay[0]:
+            self.yesButton.setText(f"{btn_text[0]}")
+        else:
+            self.yesButton.setVisible(False)
+        if btndisplay[1]:
+            self.cancelButton.setText(f"{btn_text[1]}")
+        else:
+            self.cancelButton.setVisible(False)
+
+
 class LeaVESTitleBar(StandardTitleBar):
     """LeaVES Title Bar"""
+
     def __init__(self, parent):
         super(LeaVESTitleBar, self).__init__(parent=parent)
         self.titleLabel.setStyleSheet("QLabel{ color: black}")
-        spacerItem = QSpacerItem(40, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
-        self.titlebarBtn = ToolButton(FluentIcon.CONSTRACT,parent = self)
-        self.hBoxLayout.insertItem(3,spacerItem)
+        spacer_item = QSpacerItem(40, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
+        self.titlebarBtn = ToolButton(FluentIcon.CONSTRACT, parent=self)
+        self.hBoxLayout.insertItem(3, spacer_item)
         self.hBoxLayout.insertWidget(4, self.titlebarBtn, 0, Qt.AlignmentFlag.AlignRight)
         self.titlebarBtn.clicked.connect(lambda: ShowWindows.setThemeState(parent))
 
-    def setLeaVESTitBarTheme(self, titleBarTheme:str="DARK"):
-        if titleBarTheme.upper() == "DARK":
+    def setLeaVESTitBarTheme(self, title_bar_theme: str = "DARK"):
+        if title_bar_theme.upper() == "DARK":
             self.titleLabel.setStyleSheet("QLabel{ color: white}")
-        elif titleBarTheme.upper() == "LIGHT":
+        elif title_bar_theme.upper() == "LIGHT":
             self.titleLabel.setStyleSheet("QLabel{ color: black}")
 
     def useBackGround(self):
@@ -76,6 +84,7 @@ class LeaVESTitleBar(StandardTitleBar):
         self.backgroundLable = QLabel(parent=self)
         self.backgroundLable.setGeometry(0, 0, width, height)
         self.backgroundLable.lower()
+
 
 class ShowWindows(FramelessWindow):
     def __init__(self):
@@ -108,15 +117,21 @@ class ShowWindows(FramelessWindow):
             self.theme = Theme.LIGHT
             interfaceTheme = "LIGHT"
             # titlebar theme
-            self.titleBarObj.setLeaVESTitBarTheme(titleBarTheme="LIGHT")
-        elif not isDarkTheme():
+            self.titleBarObj.setLeaVESTitBarTheme(title_bar_theme="LIGHT")
+        else:
             self.theme = Theme.DARK
             interfaceTheme = "DARK"
-            self.titleBarObj.setLeaVESTitBarTheme(titleBarTheme="DARK")
+            self.titleBarObj.setLeaVESTitBarTheme(title_bar_theme="DARK")
         # label theme
         self.setInterfaceTheme(interfaceTheme)
         # widgets theme
         setTheme(self.theme)
+
+    def setInterfaceTheme(self):
+        """设置主题
+        子类必须重写该方法"""
+        pass
+
 
 class LoginUI(ShowWindows, LoginWindow):
     def __init__(self):
@@ -127,7 +142,7 @@ class LoginUI(ShowWindows, LoginWindow):
         # self.setFixedSize(self.width(), self.height())
         self.setLoginState(0)
 
-    def setInterfaceTheme(self, interfaceTheme:str="LIGHT"):
+    def setInterfaceTheme(self, interfaceTheme: str = "LIGHT"):
         if interfaceTheme == "DARK":
             styleSheet = "background-color: #333333;"
             labelStyle = """QLabel{
@@ -135,7 +150,7 @@ class LoginUI(ShowWindows, LoginWindow):
             font-weight: bold;
             color: white
             }"""
-        elif interfaceTheme == "LIGHT":
+        else:
             styleSheet = "background-color: white;"
             labelStyle = """QLabel{
             font: 13px 'Microsoft YaHei';
@@ -144,22 +159,22 @@ class LoginUI(ShowWindows, LoginWindow):
         self.setStyleSheet(styleSheet)
         self.widget.setStyleSheet(labelStyle)
 
-    def __setQVBoxLayoutUserVisible(self, value:bool=False):
+    def __setQVBoxLayoutUserVisible(self, value: bool = False):
         """显示/隐藏账户密码栏"""
         for i in range(self.QVBoxLayout_2.count()):
-            if not isinstance(self.QVBoxLayout_2.itemAt(i),(QSpacerItem)):
+            if not isinstance(self.QVBoxLayout_2.itemAt(i), QSpacerItem):
                 item = self.QVBoxLayout_2.itemAt(i)
                 item.widget().setVisible(value)
-    
-    def __setGridLayoutServerVisible(self, value:bool=True):
+
+    def __setGridLayoutServerVisible(self, value: bool = True):
         for i in range(self.GridLayoutFServer.count()):
-            if not isinstance(self.GridLayoutFServer.itemAt(i),(QSpacerItem)):
+            if not isinstance(self.GridLayoutFServer.itemAt(i), QSpacerItem):
                 item = self.GridLayoutFServer.itemAt(i)
                 item.widget().setVisible(value)
 
-    def setLoginState(self, state:int=0):
+    def setLoginState(self, state: int = 0):
         """为1时显示用户登陆界面, 为0时显示服务器连接界面"""
-        if state == 1: 
+        if state == 1:
             self.label_title.setText("Login")
             self.__setQVBoxLayoutUserVisible(True)
             self.__setGridLayoutServerVisible(False)
@@ -173,13 +188,13 @@ class LoginUI(ShowWindows, LoginWindow):
     def getServerAddess(self):
         hostname = self.serverAdLE.text().strip()
         port = self.serverPortLE.text().strip()
-        return (hostname, port)
-    
+        return hostname, port
+
     def getUserAccount(self):
         username = self.userNameLE.text().strip()
         password = self.userPasswordLE.text().strip()
-        return (username, password)
-    
+        return username, password
+
     def resizeEvent(self, e):
         self.label.setScaledContents(False)
         super().resizeEvent(e)
@@ -193,6 +208,7 @@ class LoginUI(ShowWindows, LoginWindow):
     def loginUI(self):
         self.show()
 
+
 class MainUI(ShowWindows, MainWindow):
     def __init__(self):
         super().__init__()
@@ -201,8 +217,9 @@ class MainUI(ShowWindows, MainWindow):
         # 因为titleBar不在MainWindows.py,所以在此处设置hBoxLayout的边距
         self.hBoxLayout.setContentsMargins(0, self.titleBar.height(), 0, 0)
 
-    def setInterfaceTheme(self, interfaceTheme:str="LIGHT"):
+    def setInterfaceTheme(self, interfaceTheme: str = "LIGHT"):
         styleSheet = "background-color: #333333;" if interfaceTheme == "DARK" else "background-color: white;"
         self.titleBarObj.setStyleSheet(styleSheet)
+
     def mainUI(self):
         self.show()

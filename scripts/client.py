@@ -5,13 +5,14 @@
 # @FileName: client.py
 # coding: utf-8
 
+import hashlib
+import json
 import socket
-from typing import Any
-from Crypto.PublicKey import RSA
+
 from Crypto.Cipher import PKCS1_OAEP, AES
-from Crypto.Util.Padding import pad, unpad
+from Crypto.PublicKey import RSA
 from Crypto.Random import get_random_bytes
-import hashlib, json
+from Crypto.Util.Padding import pad, unpad
 
 from scripts.fileio import ClientPemFile
 

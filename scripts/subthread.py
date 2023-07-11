@@ -47,10 +47,11 @@ class ClientSubThread(QThread):
                                         "isSameKey": self.clientSocket.samePublicKey,
                                         "error": e,
                                         "clientObj": self.clientSocket})
-
+                print(e)
         elif self.action == 1:
             try:
                 self.sock.cfms_user_login(username=self.username, password=self.user_password)
                 self.state_signal.emit({"loginState": True, "recv": self.sock.recv_token})
             except (TimeoutError, TypeError, ValueError, OSError, ConnectionRefusedError, ConnectionError) as e:
                 self.state_signal.emit({"loginState": False, "error": e})
+                print(e)

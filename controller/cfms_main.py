@@ -14,6 +14,7 @@ from controller.cfms_user import CfmsUserManager
 from scripts.subthread import ClientSubThread
 from scripts.windows import LoginUI, MainUI, MessageDisplay, InfoMessageDisplay
 
+
 class MainClient:
     """客户端主类"""
 
@@ -30,7 +31,7 @@ class MainClient:
     def showPublicKeyMeg(self):
         title = 'The Public Key of the Server:'
         content = f"{self.client_socket_obj.public_key}"
-        w = MessageDisplay(title, content, parent=self.login_w, btndisplay=(False, True), btnText=("", "OK"))
+        w = MessageDisplay(title, content, parent=self.login_w, btndisplay=(False, True), btn_text=("", "OK"))
         w.exec()
 
     def __diffPublicKeyMeg(self):
@@ -40,7 +41,7 @@ class MainClient:
 获取的服务器公钥:
 {self.client_socket_obj.public_key}"""
         w = MessageDisplay(title, content, parent=self.login_w, btndisplay=(True, True),
-                           btnText=("断开连接", "更换公钥"))
+                           btn_text=("断开连接", "更换公钥"))
         if w.exec():
             self.__loginUI_backToLinkPageFunction()
         else:
@@ -81,7 +82,7 @@ class MainClient:
                 self.__diffPublicKeyMeg()
                 self.login_w.loadProgressBar.setVisible(False)
             else:
-                InfoMessageDisplay(self.login_w, durationTime=5000, type="error", whereis="TOP_RIGHT", title="错误",
+                InfoMessageDisplay(self.login_w, duration_time=5000, type="error", whereis="TOP_RIGHT", title="错误",
                                    infomation=f"{args['error']}")
                 self.login_w.loadProgressBar.setVisible(False)
 
@@ -124,7 +125,7 @@ class MainClient:
         else:
             print('Logining......')
             self.user_login_thread = ClientSubThread(action=1, sock=self.client_socket_obj, name=account[0],
-                                                password=account[1])
+                                                     password=account[1])
             self.user_login_thread.state_signal.connect(self.__checkLoginState)
             self.user_login_thread.start()
 
