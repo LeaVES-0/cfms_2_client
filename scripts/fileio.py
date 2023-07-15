@@ -13,20 +13,21 @@ DEFAULT_DATA_DIR = "data"
 
 
 class ClientPemFile:
-    def __init__(self, fileName: str):
+    """程序所有文件操作"""
+
+    def __init__(self, file_name: str):
         pathlib.Path(f'./{DEFAULT_PEM_DIR}').mkdir(parents=True, exist_ok=True)
-        self.pemfile = pathlib.Path(f"{DEFAULT_PEM_DIR}/{fileName!s}.pem")
-        print('PemFile:'f"{DEFAULT_PEM_DIR}/{fileName!s}.pem .")
+        self.pem_file = pathlib.Path(f"{DEFAULT_PEM_DIR}/{file_name!s}.pem")
+        print('PemFile:'f"{DEFAULT_PEM_DIR}/{file_name!s}.pem .")
 
-    def r_pemfile(self):
+    def read_pem_file(self):
         """读公钥文件"""
-        self.pemfile.touch(exist_ok=True)
-        pemfileContent = self.pemfile.read_text(encoding="utf-8")
-        return pemfileContent
+        self.pem_file.touch(exist_ok=True)
+        return self.pem_file.read_text(encoding="utf-8")
 
-    def w_pemfile(self, pemcontent: str):
+    def write_pem_file(self, pem_content: str):
         """写公钥文件"""
-        self.pemfile.write_text(data=pemcontent, encoding="utf-8")
+        self.pem_file.write_text(data=pem_content, encoding="utf-8")
 
 
 class ClientDataFile:

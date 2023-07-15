@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # @Time    : 9/7/2023 下午9:14
 # @Author  : LeaVES
-# @FileName: subthread.py
+# @FileName: sub_thread.py
 # coding: utf-8
 
 from PyQt6.QtCore import QThread, pyqtSignal
@@ -21,17 +21,21 @@ class ClientSubThread(QThread):
         2:send message
         3:receive message"""
         super(ClientSubThread, self).__init__()
-        self.kwargs = kwargs
         self.action = action
         if self.action == 0:
-            address = self.kwargs["address"]
+            address = kwargs["address"]
             self.tran_address = (str(address[0]), int(address[1]))
             self.clientSocket = Client()
 
         elif self.action == 1:
-            self.sock = self.kwargs["sock"]
-            self.username = self.kwargs["name"]
-            self.user_password = self.kwargs["password"]
+            self.sock = kwargs["sock"]
+            self.username = kwargs["name"]
+            self.user_password = kwargs["password"]
+
+        elif self.action == 2:
+            self.sock = kwargs["sock"]
+            self.request = kwargs["request"]
+            self.data = kwargs["data"]
 
     def run(self):
         if self.action == 0:
@@ -51,10 +55,15 @@ class ClientSubThread(QThread):
                 print(e)
         elif self.action == 1:
             try:
-                self.sock.cfms_user_login(username=self.username, password=self.user_password)
-                recv, account = self.sock.recv_token[0], self.sock.recv_token[1]
+                recv, account = self.sock.cfms_user_login(username=self.username, password=self.user_password)
                 self.state_signal.emit({"loginState": True, "recv": recv, "account": account})
                 # recv_token为从cfms_user_login获取到的服务器相应数据和登录原始数据
             except (TimeoutError, TypeError, ValueError, OSError, ConnectionRefusedError, ConnectionError) as e:
                 self.state_signal.emit({"loginState": False, "error": e})
                 print(e)
+        elif self.action == 2:
+            try:
+                self.sock.cfms_send_request(request=self.request, data=self.data)
+
+            except (TimeoutError, TypeError, ValueError, OSError, ConnectionRefusedError, ConnectionError) as e:
+
