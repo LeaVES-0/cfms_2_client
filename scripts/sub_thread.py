@@ -38,9 +38,10 @@ class ClientSubThread(QThread):
             try:
                 self.clientSocket.connect_cfms_server(*self.tran_address)
                 self.state_signal.emit({"address": self.tran_address,
-                                        "clientState": self.clientSocket.clientstate,
+                                        "clientState": self.clientSocket.client_state,
                                         "isSameKey": self.clientSocket.samePublicKey,
-                                        "clientObj": self.clientSocket})
+                                        "clientObj": self.clientSocket,
+                                        "isFirstTimeConnection": self.clientSocket.first_time_connection})
             except (TypeError, ValueError, OSError, UnboundLocalError, ConnectionRefusedError, ConnectionError) as e:
                 self.state_signal.emit({"address": self.tran_address,
                                         "clientState": False,
@@ -51,7 +52,9 @@ class ClientSubThread(QThread):
         elif self.action == 1:
             try:
                 self.sock.cfms_user_login(username=self.username, password=self.user_password)
-                self.state_signal.emit({"loginState": True, "recv": self.sock.recv_token})
+                recv, account = self.sock.recv_token[0], self.sock.recv_token[1]
+                self.state_signal.emit({"loginState": True, "recv": recv, "account": account})
+                # recv_token为从cfms_user_login获取到的服务器相应数据和登录原始数据
             except (TimeoutError, TypeError, ValueError, OSError, ConnectionRefusedError, ConnectionError) as e:
                 self.state_signal.emit({"loginState": False, "error": e})
                 print(e)
