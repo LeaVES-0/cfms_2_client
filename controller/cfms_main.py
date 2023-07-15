@@ -152,6 +152,7 @@ class MainClient:
                                                      password=account[1])
             self.user_login_thread.state_signal.connect(self.__check_login_state)
             self.user_login_thread.start()
+
     def get_file_list(self):
         pass
 

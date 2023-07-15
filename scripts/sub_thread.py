@@ -64,6 +64,6 @@ class ClientSubThread(QThread):
         elif self.action == 2:
             try:
                 self.sock.cfms_send_request(request=self.request, data=self.data)
-
             except (TimeoutError, TypeError, ValueError, OSError, ConnectionRefusedError, ConnectionError) as e:
+                self.state_signal.emit
 

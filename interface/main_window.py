@@ -28,10 +28,11 @@ class MainWindow:
         self.hBoxLayout.addWidget(self.stackWidget)
         self.hBoxLayout.setStretchFactor(self.stackWidget, 1)
         # 在导航栏添加组件
-        self.addSubInterface(self.home_page, FluentIcon.HOME_FILL, "Home", self.stackWidget.setCurrentWidget(self.home_page))
+        self.addSubInterface(self.home_page, FluentIcon.HOME_FILL, "Home",
+                             self.stackWidget.setCurrentWidget(self.home_page))
         self.navigationInterface.addSeparator()
 
-    def addSubInterface(self, interface, icon, text: str,function, position=NavigationItemPosition.TOP, parent=None):
+    def addSubInterface(self, interface, icon, text: str, function, position=NavigationItemPosition.TOP, parent=None):
         """ 添加栏目 """
         self.stackWidget.addWidget(interface)
         self.navigationInterface.addItem(
