@@ -27,10 +27,7 @@ class Client:
         socket.setdefaulttimeout(30)
         self.AEC_key = get_random_bytes(32)  # 生成对称加密密钥
         self.cfms_dict_to_send = {"version": 1, "request": "", "data": {}, "token": ""}
-        self.public_key, self.pem_file = None, None
-        self.samePublicKey = True
-        self.client_state = False
-        self.first_time_connection = False
+        self.pem_file = None
 
     def cfms_AES_encrypt(self, data):
         """AES加密"""
@@ -59,38 +56,44 @@ class Client:
         self.client.sendall(self.cfms_AES_encrypt(json.dumps(request)))
         return True
 
-    def connect_cfms_server(self, host, port=DEFAULT_PORT):
+    def connect_cfms_server(self, host: str, port=DEFAULT_PORT) -> dict:
         """连接到服务器"""
-        self.pem_file = ClientPemFile(file_name=f"KEY_{host}_{port}")
-        self.client.settimeout(40)
-        self.client.connect((host, port))
-        self.client.sendall("hello".encode())
-        self.client.recv(1024)
-        self.client.sendall("enableEncryption".encode())
-        self.public_key = json.loads(self.client.recv(1024).decode(encoding="utf-8"))['public_key']
-        local_key = self.pem_file.read_pem_file()
+        first_time_connection = False
+        try:
+            self.pem_file = ClientPemFile(file_name=f"KEY_{host}_{port}")
+            self.client.settimeout(40)
+            self.client.connect((host, port))
+            self.client.sendall("hello".encode())
+            self.client.recv(1024)
+            self.client.sendall("enableEncryption".encode())
+            public_key = json.loads(self.client.recv(1024).decode(encoding="utf-8"))['public_key']
+            local_key = self.pem_file.read_pem_file()
 
-        if not local_key:
-            self.pem_file.write_pem_file(pem_content=self.public_key)
-            print("It's the first time for you to link this server.")
-            self.first_time_connection = True
-        if self.public_key == local_key:
-            print(f"The public key is \n {self.public_key}")
-        elif self.public_key != local_key and not self.first_time_connection:
-            print(f"The public key of the server is \n {self.public_key}. \n But your public key is \n {local_key}.")
-            self.samePublicKey = False
-            return
+            if not local_key:
+                self.pem_file.write_pem_file(pem_content=public_key)
+                print("It's the first time for you to link this server.")
+                first_time_connection = True
+            if public_key == local_key:
+                print(f"The public key is \n {public_key}")
+            elif public_key != local_key and not first_time_connection:
+                print(f"The public key of the server is \n {public_key}."
+                      f" \n But your public key is \n {local_key}.")
+                return {"clientState": False, "clientObj": self, "address": (host, port),
+                        "isSameKey": False, "public_key": public_key}
 
-        rsa_public_key = RSA.import_key(self.public_key)
-        rsa_public_cipher = PKCS1_OAEP.new(rsa_public_key)
+            rsa_public_key = RSA.import_key(public_key)
+            rsa_public_cipher = PKCS1_OAEP.new(rsa_public_key)
 
-        encrypted_data = rsa_public_cipher.encrypt(self.AEC_key)  # 用公钥加密对称加密密钥
-        self.client.sendall(encrypted_data)  # 发送加密的对称加密密钥
+            encrypted_data = rsa_public_cipher.encrypt(self.AEC_key)  # 用公钥加密对称加密密钥
+            self.client.sendall(encrypted_data)  # 发送加密的对称加密密钥
 
-        server_response = json.loads(self.cfms_AES_decrypt(self.client.recv(1024)))
-        if server_response['code'] == 0:
-            print(f"Server state: {server_response['code']}. \nLink successful.")
-            self.client_state = True
+            server_response = json.loads(self.cfms_AES_decrypt(self.client.recv(1024)))
+            if server_response['code'] == 0:
+                return {"clientState": True, "clientObj": self, "address": (host, port),
+                        "isFirstTimeConnection": first_time_connection, "public_key": public_key}
+        except (TypeError, ValueError, OSError, UnboundLocalError, ConnectionRefusedError, ConnectionError) as e:
+            return {"clientState": False, "clientObj": self, "address": (host, port),
+                    "isFirstTimeConnection": first_time_connection, "isSameKey": True, "error": e}
 
     def set_token(self, token: str):
         self.cfms_dict_to_send.update({"token": f'{token}'})
