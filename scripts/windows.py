@@ -5,7 +5,7 @@
 # @FileName: windows.py
 # coding: utf-8
 
-from PyQt6.QtCore import Qt, QSize
+from PyQt6.QtCore import *
 from PyQt6.QtGui import QIcon, QPixmap
 from PyQt6.QtWidgets import *
 from qfluentwidgets import *
@@ -62,9 +62,8 @@ class MessageDisplay(MessageDialog):
 
 class LeaVESTitleBar(StandardTitleBar):
     """LeaVES Title Bar"""
-
     def __init__(self, parent):
-        super(LeaVESTitleBar, self).__init__(parent=parent)
+        super(LeaVESTitleBar, self).__init__(parent)
         self.titleLabel.setStyleSheet("QLabel{ color: black}")
         spacer_item = QSpacerItem(40, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
         self.titlebarBtn = ToolButton(FluentIcon.CONSTRACT, parent=self)
@@ -90,7 +89,7 @@ class ShowWindows(FramelessWindow):
         # 标题栏
         self.titleBarObj = LeaVESTitleBar(parent=self)
         self.setTitleBar(self.titleBarObj)
-        self.titleBar.raise_()
+        self.titleBarObj.raise_()
         self.setWindowTitle('cfms__2.0')
         self.setWindowIcon(QIcon(f"{RESOURCE_IMAGES}logo.png"))
         # 大小
@@ -127,6 +126,7 @@ class ShowWindows(FramelessWindow):
 class LoginUI(ShowWindows, LoginWindow):
     def __init__(self, **kwargs):
         super().__init__()
+        self.setup_ui(self)
         self.login_finished = False
         self.client_thread = kwargs["thread"]
         self.label.setPixmap(QPixmap(f"{RESOURCE_IMAGES}login_b.jpg"))
@@ -198,6 +198,7 @@ class LoginUI(ShowWindows, LoginWindow):
             Qt.TransformationMode.SmoothTransformation
         )
         self.label.setPixmap(pixmap)
+        self.label.lower()
 
     def closeEvent(self, event):
         if not self.login_finished:
@@ -212,6 +213,7 @@ class MainUI(ShowWindows, MainWindow):
 
     def __init__(self, **kwargs):
         super(MainUI, self).__init__()
+        self.setup_ui(self)
         self.get_file_function = kwargs["get_files_func"]  # 从别处传来的函数
         self.client_thread = kwargs["thread"]
         self.addSubInterface(self.file_page, FluentIcon.FOLDER, lambda: self.show_file_page(), "Files")

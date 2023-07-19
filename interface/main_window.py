@@ -5,23 +5,27 @@
 # coding: utf-8
 
 from PyQt6.QtWidgets import *
-from PyQt6.QtCore import *
 from qfluentwidgets import NavigationInterface, FluentIcon, NavigationItemPosition
+
 from scripts.pages import HomePage, FilePage
 
 
 class MainWindow:
-    """主窗口"""
     def __init__(self):
-        self.hBoxLayout = QHBoxLayout(self)
+        # 创建导航栏组件
+        self.stackWidget = None
+        self.hBoxLayout = None
+        self.home_page = HomePage("home")
+        self.file_page = FilePage("file")
         self.navigationInterface = NavigationInterface(self, showMenuButton=True)
-        self.stackWidget = QStackedWidget(self)
+
+    """主窗口"""
+    def setup_ui(self, form):
+        self.hBoxLayout = QHBoxLayout(form)
+        self.stackWidget = QStackedWidget(form)
         self.stackWidget.setStyleSheet("""QLabel{
             font: 13px 'Microsoft YaHei'
             }""")
-        # 创建导航栏组件
-        self.home_page = HomePage("home")
-        self.file_page = FilePage("file")
         # 将导航栏目添加到hBoxLayout
         self.hBoxLayout.setSpacing(0)
         self.hBoxLayout.addWidget(self.navigationInterface)

@@ -9,6 +9,7 @@ import sys
 from PyQt6.QtCore import *
 from PyQt6.QtWidgets import QApplication
 from qfluentwidgets import FluentTranslator, Theme
+import threading
 import time
 
 from controller.cfms_user import CfmsUserManager
@@ -167,6 +168,7 @@ class MainClient(QObject):
             self.sub_thread.start()
 
     def get_dir(self, root_dir: bool = False, dir_id: str = None):
+        self.main_w.file_page.loadProgressBar.setVisible(True)
         try:
             self.sub_thread.signal.disconnect()
             self.ui_signal.disconnect()
@@ -204,15 +206,17 @@ class MainClient(QObject):
             return files_information
 
         def __get_recv(recv):
+            _timer = threading.Timer(1, lambda: self.main_w.file_page.loadProgressBar.setVisible(False))
             self.sub_thread.signal.disconnect(__get_recv)
             if recv["state"]:
                 if recv["recv"]["code"] == 0:
                     result = transform_file_dict(recv["recv"])
                     self.ui_signal.emit(result)
+                    _timer.start()
             else:
-                info_message_display(self.login_w, information_type="error", whereis="TOP_LEFT", title="错误",
+                info_message_display(self.main_w, information_type="error", whereis="TOP_LEFT", title="错误",
                                      information=f"获取文件时出错{recv['error']}")
-
+                _timer.start()
         self.sub_thread.signal.connect(__get_recv)
         if root_dir:
             self.sub_thread.load_sub_thread(request="getRootDir")

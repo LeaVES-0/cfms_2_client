@@ -17,9 +17,10 @@ RESOURCE_IMAGES = "interface/resource/images/"
 
 class ShowPages(QWidget):
     def __init__(self):
-        super().__init__()
+        super().__init__(None)
         QMetaObject.connectSlotsByName(self)
         self.loadProgressBar = IndeterminateProgressBar(self)
+        self.loadProgressBar.setVisible(False)
 
     def resizeEvent(self, e):
         self.loadProgressBar.setGeometry(0, 0, self.width(), 10)
@@ -30,6 +31,9 @@ class HomePage(ShowPages, PrimaryHomePage):
         super(HomePage, self).__init__()
         self.setObjectName(object_name)
 
+    def resizeEvent(self, e):
+        super().resizeEvent(e)
+
 
 class FilePage(ShowPages, PrimaryFilePage):
     def __init__(self, object_name):
@@ -38,6 +42,4 @@ class FilePage(ShowPages, PrimaryFilePage):
 
     def resizeEvent(self, e):
         super().resizeEvent(e)
-        self.file_tree.setGeometry(0, 170, 250, self.height())
-        self.table_view.setGeometry(275, 180, self.width()-275, 5000)
-
+        self.verticalLayoutWidget.setFixedWidth(self.width())

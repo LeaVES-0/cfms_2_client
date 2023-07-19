@@ -4,9 +4,9 @@
 # @FileName: file_page.py
 # coding: utf-8
 
+from PyQt6.QtCore import *
 from PyQt6.QtWidgets import *
 from PyQt6.QtGui import *
-from PyQt6.QtCore import *
 from qfluentwidgets import *
 
 
@@ -22,22 +22,45 @@ class PrimaryFilePage:
         size_policy.setHorizontalStretch(0)
         size_policy.setVerticalStretch(0)
         self.verticalLayoutWidget.setSizePolicy(size_policy)
-        self.verticalLayout = QVBoxLayout(self.verticalLayoutWidget)
-        self.verticalLayout.setContentsMargins(0, 0, 0, 0)
+
+        self.verticalLayout = QVBoxLayout(self.verticalLayoutWidget)  # 全局布局
+        self.verticalLayoutWidget.setContentsMargins(0, 0, 0, 0)
         self.verticalLayout.setObjectName("verticalLayout")
-        self.titleLabel = QLabel()
-        self.titleLabel.setText("文件管理")
+
+        self.verticalLayout_0_widget = QWidget(self)  # 这个控件和布局用来装标题和一些其他东西
+        self.verticalLayout_0 = QGridLayout(self.verticalLayout_0_widget)
+        self.verticalLayout_0.setObjectName("verticalLayout_0")
+
+        self.titleLabel = QLabel()  # 页面标题
+        self.titleLabel.setText("Files")
         self.titleLabel.setStyleSheet(
             """QLabel{
             font: 45px 'Microsoft YaHei';
             }"""
         )
         self.titleLabel.setContentsMargins(30, 20, 0, 0)
-        self.verticalLayout.addWidget(self.titleLabel)
-        self.file_tree = TreeWidget(self)
+        self.verticalLayout_0.addWidget(self.titleLabel)
+
+        self.verticalLayout_2_widget = QWidget(self)  # 这个控件和布局用来装文件树和文件目录
+        self.verticalLayout_2 = QHBoxLayout(self.verticalLayout_2_widget)
+        self.verticalLayout_2.setObjectName("verticalLayout_2")
+
+        self.file_tree = TreeWidget() # 文件树
         self.__file_tree()
-        self.table_view = TableWidget(self)  # 创建表格
-        self.table_view.setObjectName("table_view")
+        self.verticalLayout_2.addWidget(self.file_tree, 2)
+
+        self.table_view = TableWidget()  # 创建表格
+        self.table_view.setObjectName("table_file_view")
+        self.table_view.setWordWrap(True)
+        self.table_view.setColumnCount(5)
+        self.table_view.cellDoubleClicked.connect(self.file_list_button)  # Qt右键打开在此处实现过于复杂
+        self.table_view.verticalHeader().hide()  # 表头
+        self.table_view.setHorizontalHeaderLabels(['FileName', 'Type', 'Size', 'Create Date', 'Permission'])  # 行标题
+        self.table_view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.verticalLayout_2.addWidget(self.table_view, 5)
+
+        self.verticalLayout.addWidget(self.verticalLayout_0_widget)
+        self.verticalLayout.addWidget(self.verticalLayout_2_widget)
 
     def file_list_button(self, row, column):
         """文件按键"""
@@ -51,16 +74,10 @@ class PrimaryFilePage:
 
     def __file_tree(self):
         """文件树"""
-        item1 = QTreeWidgetItem()
-        # item1.addChildren([QtWidgets.QTreeWidgetItem('file_1')])
+        root_item = QTreeWidgetItem()
 
-        self.file_tree.addTopLevelItem(item1)
-        item1.setText(0, "/")
-        # item2 = QtWidgets.QTreeWidgetItem(['folder_2'])
-        # item21 = QtWidgets.QTreeWidgetItem(['file_2'])
-        # item21.addChildren([])
-        # item2.addChild(item21)
-        # self.file_tree.addTopLevelItem(item2)
+        self.file_tree.addTopLevelItem(root_item)
+        root_item.setText(0, "/")
 
         self.file_tree.expandAll()
         self.file_tree.setHeaderHidden(True)
@@ -74,14 +91,8 @@ class PrimaryFilePage:
 
     def list_files(self, file_information: list):
         """设置文件列表"""
-        self.table_view.setWordWrap(True)
         self.table_view.setRowCount(len(file_information))
-        self.table_view.setColumnCount(5)
-        self.table_view.cellDoubleClicked.connect(self.file_list_button)  # Qt右键打开在此处实现过于复杂
         # 批量设置表格项
         for row, file_info in enumerate(file_information):
             for column in range(5):
                 self.table_view.setItem(row, column, self.__create_list_item(file_info[column]))
-        self.table_view.verticalHeader().hide()  # 表头
-        self.table_view.setHorizontalHeaderLabels(['FileName', 'Type', 'Size', 'Create Date', 'Permission'])  # 行标题
-        self.table_view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
