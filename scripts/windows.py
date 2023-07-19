@@ -125,8 +125,10 @@ class ShowWindows(FramelessWindow):
 
 
 class LoginUI(ShowWindows, LoginWindow):
-    def __init__(self):
+    def __init__(self, **kwargs):
         super().__init__()
+        self.login_finished = False
+        self.client_thread = kwargs["thread"]
         self.label.setPixmap(QPixmap(f"{RESOURCE_IMAGES}login_b.jpg"))
         self.label_head_icon.setPixmap(QPixmap(f"{RESOURCE_IMAGES}logo.png"))
         self.titleBar.hBoxLayout.removeWidget(self.titleBar.maxBtn)
@@ -158,13 +160,14 @@ class LoginUI(ShowWindows, LoginWindow):
                 item.widget().setVisible(value)
 
     def __setGridLayoutServerVisible(self, value: bool = True):
+        """显示/隐藏服务器连接栏"""
         for i in range(self.GridLayoutFServer.count()):
             if not isinstance(self.GridLayoutFServer.itemAt(i), QSpacerItem):
                 item = self.GridLayoutFServer.itemAt(i)
                 item.widget().setVisible(value)
 
     def setLoginState(self, state: int = 0):
-        """为1时显示用户登陆界面, 为0时显示服务器连接界面"""
+        """为0时显示服务器连接界面，为1时显示用户登陆界面."""
         if state == 1:
             self.label_title.setText("Login")
             self.__set_qvboxlayout_user_visible(True)
@@ -196,22 +199,28 @@ class LoginUI(ShowWindows, LoginWindow):
         )
         self.label.setPixmap(pixmap)
 
+    def closeEvent(self, event):
+        if not self.login_finished:
+            self.client_thread.close_connection()
+        event.accept()
+
     def loginUI(self):
         self.show()
 
 
 class MainUI(ShowWindows, MainWindow):
-    def __init__(self):
-        super().__init__()
-        # 防止导航栏挡住标题栏
-        # 因为titleBar不在MainWindows.py,所以在此处设置hBoxLayout的边距
-        self.file_list = []
-        self.hBoxLayout.setContentsMargins(0, self.titleBar.height(), 0, 0)
-        self.addSubInterface(self.file_page, FluentIcon.FOLDER, 'File', self.load_file_page(),
-                             position=NavigationItemPosition.SCROLL)
 
-    def load_file_page(self):
+    def __init__(self, **kwargs):
+        super(MainUI, self).__init__()
+        self.get_file_function = kwargs["get_files_func"]  # 从别处传来的函数
+        self.client_thread = kwargs["thread"]
+        self.addSubInterface(self.file_page, FluentIcon.FOLDER, lambda: self.show_file_page(), "Files")
+        # 因为titleBar不在MainWindows.py,所以在此处设置hBoxLayout的边距
+        self.hBoxLayout.setContentsMargins(0, self.titleBar.height(), 0, 0)
+
+    def show_file_page(self):
         self.stackWidget.setCurrentWidget(self.file_page)
+        self.get_file_function(True)
 
     def set_interface_theme(self, interface_theme: str = "LIGHT"):
         if interface_theme == "DARK":
@@ -231,6 +240,10 @@ class MainUI(ShowWindows, MainWindow):
             }"""
         self.stackWidget.setStyleSheet(label_style)
         self.setStyleSheet(interface_style_sheet)
+
+    def closeEvent(self, event):
+        self.client_thread.close_connection()
+        event.accept()
 
     def mainUI(self):
         self.show()

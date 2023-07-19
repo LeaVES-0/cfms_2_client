@@ -8,7 +8,6 @@
 from PyQt6.QtCore import QMetaObject
 from PyQt6.QtWidgets import *
 from qfluentwidgets import *
-from qfluentwidgets.components.widgets.acrylic_label import AcrylicLabel
 
 from interface.home_page import PrimaryHomePage
 from interface.file_page import PrimaryFilePage
@@ -20,6 +19,10 @@ class ShowPages(QWidget):
     def __init__(self):
         super().__init__()
         QMetaObject.connectSlotsByName(self)
+        self.loadProgressBar = IndeterminateProgressBar(self)
+
+    def resizeEvent(self, e):
+        self.loadProgressBar.setGeometry(0, 0, self.width(), 10)
 
 
 class HomePage(ShowPages, PrimaryHomePage):
@@ -32,7 +35,6 @@ class FilePage(ShowPages, PrimaryFilePage):
     def __init__(self, object_name):
         super(FilePage, self).__init__()
         self.setObjectName(object_name)
-        self.__list_files()
 
     def resizeEvent(self, e):
         super().resizeEvent(e)
