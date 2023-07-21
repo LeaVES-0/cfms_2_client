@@ -10,6 +10,7 @@ import pathlib
 
 DEFAULT_PEM_DIR = "data/saved_certs"
 DEFAULT_DATA_DIR = "data"
+DEFAULT_DOWNLOAD_PATH = "download"
 
 
 class ClientPemFile:
@@ -44,3 +45,14 @@ class ClientDataFile:
 
     def w_datafile(self, data):
         self.data.write_text(json.dumps(obj=data, indent=4))
+
+
+class FtpFilesDownloadManager:
+    def __init__(self, down_path: str = DEFAULT_DOWNLOAD_PATH):
+        pathlib.Path(f'./{down_path}').mkdir(parents=True, exist_ok=True)
+
+    def set_file(self, file_name):
+        self.file = pathlib.Path(f'{DEFAULT_DOWNLOAD_PATH}/{file_name!s}.cfms_download').open(mode='wb')
+
+    def write_file(self, data):
+        self.file.write(data)

@@ -20,7 +20,7 @@ class LoginWindow:
 
     def setup_ui(self, form):
         # 主窗口
-        self.horizontalLayout = QHBoxLayout(form)
+        self.horizontalLayout = QHBoxLayout(self)
         self.horizontalLayout.setContentsMargins(0, 0, 0, 0)
         self.horizontalLayout.setSpacing(0)
         self.widget = QWidget(form)
@@ -52,7 +52,7 @@ class LoginWindow:
     def __init_grid_layout_server(self):
         # 设置服务器连接部分
         # 创建QGridLayout容器
-        self.GridLayoutFServer = QGridLayout(self.widget)
+        self.GridLayoutFServer = QGridLayout()
         self.GridLayoutFServer.setHorizontalSpacing(4)
         self.GridLayoutFServer.setVerticalSpacing(9)
         self.GridLayoutFServer.setObjectName("GridLayoutFServer")
@@ -82,6 +82,11 @@ class LoginWindow:
         self.link_server_button = PrimaryPushButton()
         self.link_server_button.setObjectName("link_server_button")
         self.GridLayoutFServer.addWidget(self.link_server_button, 3, 0, 1, 5)
+
+        self.link_cancel_button = PrimaryPushButton()
+        self.link_cancel_button.setObjectName("cancel_server_button")
+        self.GridLayoutFServer.addWidget(self.link_cancel_button, 4, 0, 1, 5)
+        self.link_cancel_button.setEnabled(False)
 
     def __init_qvboxlayout_user(self):
         self.QVBoxLayout_2 = QVBoxLayout()
@@ -209,3 +214,4 @@ class LoginWindow:
         self.login_Button.setToolTip(f"{LOGIN_BUTTON_TIP}")
         self.back_Button.setText("断开连接")
         self.link_server_button.setText("连接到服务器")
+        self.link_cancel_button.setText('取消')

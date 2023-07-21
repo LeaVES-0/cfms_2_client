@@ -27,7 +27,7 @@ class ShowPages(QWidget):
 
 
 class HomePage(ShowPages, PrimaryHomePage):
-    def __init__(self, object_name):
+    def __init__(self, object_name, **kwargs):
         super(HomePage, self).__init__()
         self.setObjectName(object_name)
 
@@ -36,9 +36,10 @@ class HomePage(ShowPages, PrimaryHomePage):
 
 
 class FilePage(ShowPages, PrimaryFilePage):
-    def __init__(self, object_name):
+    def __init__(self, object_name, **kwargs):
         super(FilePage, self).__init__()
         self.setObjectName(object_name)
+        self.setup_ui(kwargs)
 
     def resizeEvent(self, e):
         super().resizeEvent(e)

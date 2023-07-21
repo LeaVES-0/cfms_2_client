@@ -6,11 +6,12 @@
 # coding: utf-8
 
 import sys
+import threading
+import time
+
 from PyQt6.QtCore import *
 from PyQt6.QtWidgets import QApplication
 from qfluentwidgets import FluentTranslator, Theme
-import threading
-import time
 
 from controller.cfms_user import CfmsUserManager
 from scripts.client_thread import ClientSubThread
@@ -19,18 +20,20 @@ from scripts.windows import LoginUI, MainUI, MessageDisplay, info_message_displa
 
 class MainClient(QObject):
     """客户端主类"""
-    ui_signal = pyqtSignal(object, name="MainClient")
+    main_signal = pyqtSignal(object, name="MainClient")
 
     def __init__(self):
         super().__init__(None)
         self.sub_thread = ClientSubThread()
-        self.public_key = None
         self.usermanager = CfmsUserManager()
         self.QtApp = QApplication(sys.argv)
-        translator = FluentTranslator(QLocale())
         self.login_w = LoginUI(thread=self.sub_thread)
+        self.main_w = MainUI(functions={'get_files_func': self.get_dir, 'file_rename_action': self.file_rename_action},
+                             thread=self.sub_thread)
+        self.public_key = None
+        self._is_cancel_link = False  # 是否取消连接的内部特性
+        translator = FluentTranslator(QLocale())
         self.login_w.setLoginState(0)
-        self.main_w = MainUI(get_files_func=self.get_dir, thread=self.sub_thread)
         self.QtApp.installTranslator(translator)
 
         self.__login_ui_set_buttons()
@@ -63,6 +66,11 @@ class MainClient(QObject):
         self.login_w.connectedServerLabel.setVisible(False)
         self.login_w.connectedServerLabel.setText("")
 
+    def cancel_link(self):
+        self._is_cancel_link = True
+        self.sub_thread.retry()
+        info_message_display(self.login_w, information_type="info", whereis="TOP_LEFT", title="已取消", )
+
     def __login_ui_set_buttons(self):
         """login_ui buttons bind"""
         self.login_w.link_server_button.clicked.connect(lambda: self.link_server_function(
@@ -70,6 +78,7 @@ class MainClient(QObject):
         self.login_w.back_Button.clicked.connect(lambda: self.close_connection_function())
         self.login_w.login_Button.clicked.connect(lambda: self.user_login_function(self.login_w.getUserAccount()))
         self.login_w.connectedServerLabel.clicked.connect(lambda: self.show_public_key_meg())
+        self.login_w.link_cancel_button.clicked.connect(self.cancel_link)
 
     def __check_link_state(self, args: dict):
         """检测连接状态"""
@@ -90,16 +99,21 @@ class MainClient(QObject):
 
         else:
             if not args["isSameKey"]:
+                self.login_w.link_server_button.setEnabled(True)
+                self.login_w.link_cancel_button.setEnabled(False)
                 self.login_w.loadProgressBar.setVisible(False)
-                info_message_display(self.login_w, duration_time=2000, information_type="warn", whereis="TOP_RIGHT",
+                info_message_display(self.login_w, duration_time=1500, information_type="warn", whereis="TOP_RIGHT",
                                      title=" 公钥异常")
                 self.__diff_public_key_meg()
             else:
-                info_message_display(self.login_w, duration_time=2000, information_type="error", whereis="TOP_RIGHT",
-                                     title="错误", information=f"{args['error']}")
+                self.login_w.link_server_button.setEnabled(True)
+                self.login_w.link_cancel_button.setEnabled(False)
                 self.login_w.loadProgressBar.setVisible(False)
+                if not self._is_cancel_link:
+                    info_message_display(self.login_w, duration_time=2000, information_type="error",
+                                         whereis="TOP_RIGHT", title="错误", information=f"{args['error']}")
+                self._is_cancel_link = False
         self.sub_thread.signal.disconnect(self.__check_link_state)  # 断开信号槽连接
-        print("Disconnected function'__check_link_state'")
 
     def __check_login_state(self, signal: dict):
         """检测登陆状态"""
@@ -108,6 +122,7 @@ class MainClient(QObject):
             if recv_from_server["code"] == 0:
                 # 登录成功
                 self.login_w.login_finished = True
+                self.sub_thread.ftp_port = recv_from_server["ftp_port"]  # ftp 端口
                 print("Login successful!")
                 info_message_display(self.main_w, information_type="info", whereis="TOP", title="登录成功!")
                 login_information = signal['account']  # 存有用户账户的元组
@@ -136,13 +151,14 @@ class MainClient(QObject):
                                      information=f"密码错误:{msg!s}")
         elif not signal["loginState"]:
             # 其他异常
-            self.sub_thread.retry()
             info_message_display(self.main_w, information_type="error", whereis="TOP_LEFT", title="错误",
                                  information=f"{signal['error']!s}")
         self.sub_thread.signal.disconnect(self.__check_login_state)  # 不管登录成功与否,都断开信号槽连接
 
     def link_server_function(self, address: tuple):
         """连接服务器"""
+        self.login_w.link_server_button.setEnabled(False)
+        self.login_w.link_cancel_button.setEnabled(True)
         if not address[0] or not address[1]:
             info_message_display(self.login_w, information_type="warn", whereis="TOP_LEFT", title="警告",
                                  information="地址不得为空")
@@ -152,6 +168,10 @@ class MainClient(QObject):
         else:
             print("Connecting......")
             self.login_w.loadProgressBar.setVisible(True)
+            try:
+                self.sub_thread.signal.disconnect()  # 再次确认断开
+            except TypeError:
+                ...
             self.sub_thread.load_sub_thread(action=0, address=address)
             self.sub_thread.signal.connect(self.__check_link_state)
             self.sub_thread.start()
@@ -171,12 +191,12 @@ class MainClient(QObject):
         self.main_w.file_page.loadProgressBar.setVisible(True)
         try:
             self.sub_thread.signal.disconnect()
-            self.ui_signal.disconnect()
+            self.main_signal.disconnect()
         except TypeError:
             pass
-        self.ui_signal.connect(self.main_w.file_page.list_files)
+        self.main_signal.connect(self.main_w.file_page.set_file_tree_list)
 
-        def transform_file_dict(recv: dict):
+        def transform_file_dict(recv: dict) -> tuple:
             """转化为列表并返回"""
             files_information = []
             del recv["code"]
@@ -187,23 +207,27 @@ class MainClient(QObject):
                                                 time.localtime(i['properties']["created_time"]))
                 except KeyError:
                     time_string = "Unknown"
-                size = i["properties"].get("size", "Unknown")
-                size_units = ["KB", "MB", "GB", "TB"]
-                for i_index in range(0, 4):
-                    try:
+                size_units = ["B", "KB", "MB", "GB", "TB", "PB"]
+                try:
+                    f_size = "Unknown"
+                    size = int(i["properties"].get("size", "Unknown"))
+                    for i_index in range(0, 6):
                         if size >= 1024:
                             size /= 1024
                         else:
-                            round(size, 3)
-                            size = f"{size} {size_units[i_index]}"
-                    except (ValueError, TypeError):
-                        size = "Unknown"
-
+                            round(size, 2)
+                            f_size = f"{size!s} {size_units[i_index]}"
+                            break
+                except (ValueError, TypeError):
+                    f_size = "Unknown"
                 file_info = [i.get("name", "Untitled"), i.get("type", "Unknown"),
-                             size, time_string, i.get("permission", "Unknown"),
+                             f_size, time_string, i.get("permission", "Unknown"),
                              files_id[index]]
                 files_information.append(file_info)
-            return files_information
+                for file in files_information:
+                    if file[1] == "dir":
+                        file[2] = ""
+            return (files_information,)
 
         def __get_recv(recv):
             _timer = threading.Timer(1, lambda: self.main_w.file_page.loadProgressBar.setVisible(False))
@@ -211,12 +235,13 @@ class MainClient(QObject):
             if recv["state"]:
                 if recv["recv"]["code"] == 0:
                     result = transform_file_dict(recv["recv"])
-                    self.ui_signal.emit(result)
+                    self.main_signal.emit(result)
                     _timer.start()
             else:
                 info_message_display(self.main_w, information_type="error", whereis="TOP_LEFT", title="错误",
                                      information=f"获取文件时出错{recv['error']}")
                 _timer.start()
+
         self.sub_thread.signal.connect(__get_recv)
         if root_dir:
             self.sub_thread.load_sub_thread(request="getRootDir")
@@ -224,6 +249,26 @@ class MainClient(QObject):
         else:
             self.sub_thread.load_sub_thread(request="getDir", data={"id": dir_id})
             self.sub_thread.start()
+
+    def file_rename_action(self, data, file_id: str, obj_type: str):
+        try:
+            self.sub_thread.signal.disconnect()
+            self.main_signal.disconnect()
+        except TypeError:
+            pass
+
+        def __get_recv(recv):
+            print(recv)
+
+        self.sub_thread.signal.connect(__get_recv)
+        if obj_type == "dir":
+            self.sub_thread.load_sub_thread(request="operateDir", data={"dir_id": file_id, "action": 'rename',
+                                                                        'new_dirname': data})
+        elif obj_type == "file":
+            self.sub_thread.load_sub_thread(request="operateFile", data={"file_id": file_id, "action": 'rename',
+                                                                         'new_filename': data})
+        self.sub_thread.start()
+        print("called")
 
     def run(self, debug: bool = False):
         self.login_w.loginUI()

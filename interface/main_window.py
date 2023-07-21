@@ -7,16 +7,12 @@
 from PyQt6.QtWidgets import *
 from qfluentwidgets import NavigationInterface, FluentIcon, NavigationItemPosition
 
-from scripts.pages import HomePage, FilePage
-
 
 class MainWindow:
     def __init__(self):
         # 创建导航栏组件
         self.stackWidget = None
         self.hBoxLayout = None
-        self.home_page = HomePage("home")
-        self.file_page = FilePage("file")
         self.navigationInterface = NavigationInterface(self, showMenuButton=True)
 
     """主窗口"""
@@ -31,10 +27,6 @@ class MainWindow:
         self.hBoxLayout.addWidget(self.navigationInterface)
         self.hBoxLayout.addWidget(self.stackWidget)
         self.hBoxLayout.setStretchFactor(self.stackWidget, 1)
-        # 在导航栏添加组件
-        self.addSubInterface(self.home_page, FluentIcon.HOME_FILL,
-                             lambda: self.stackWidget.setCurrentWidget(self.home_page), "Home")
-        self.navigationInterface.addSeparator()
 
     def addSubInterface(self, interface, icon, function, text: str, position=NavigationItemPosition.TOP, parent=None):
         """ 添加栏目 """

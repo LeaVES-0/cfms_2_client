@@ -13,6 +13,7 @@ from qframelesswindow import StandardTitleBar, FramelessWindow
 
 from interface.login_window import LoginWindow
 from interface.main_window import MainWindow
+from scripts.pages import HomePage, FilePage
 
 RESOURCE_IMAGES = "interface/resource/images/"
 DEFAULT_THEME_COLOUR = "#28afe9"
@@ -174,6 +175,8 @@ class LoginUI(ShowWindows, LoginWindow):
             self.__setGridLayoutServerVisible(False)
         elif state == 0:
             self.label_title.setText("Link Server")
+            self.link_server_button.setEnabled(True)
+            self.link_cancel_button.setEnabled(False)
             self.__set_qvboxlayout_user_visible(False)
             self.__setGridLayoutServerVisible(True)
         else:
@@ -214,9 +217,18 @@ class MainUI(ShowWindows, MainWindow):
     def __init__(self, **kwargs):
         super(MainUI, self).__init__()
         self.setup_ui(self)
-        self.get_file_function = kwargs["get_files_func"]  # 从别处传来的函数
+        self.get_file_function = kwargs["functions"]["get_files_func"]  # 从别处传来的函数们
+        self.file_rename_action = kwargs["functions"]["file_rename_action"]
         self.client_thread = kwargs["thread"]
+        self.home_page = HomePage("home")
+        self.file_page = FilePage("file", functions={'get_file_function': self.get_file_function,
+                                                     'file_rename_function': self.file_rename_action})
+        # 在导航栏添加组件
+        self.addSubInterface(self.home_page, FluentIcon.HOME_FILL,
+                             lambda: self.stackWidget.setCurrentWidget(self.home_page), "Home")
+        self.navigationInterface.addSeparator()
         self.addSubInterface(self.file_page, FluentIcon.FOLDER, lambda: self.show_file_page(), "Files")
+
         # 因为titleBar不在MainWindows.py,所以在此处设置hBoxLayout的边距
         self.hBoxLayout.setContentsMargins(0, self.titleBar.height(), 0, 0)
 

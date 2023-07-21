@@ -14,8 +14,9 @@ from Crypto.PublicKey import RSA
 from Crypto.Random import get_random_bytes
 from Crypto.Util.Padding import pad, unpad
 from PyQt6.QtCore import *
+from ftplib import FTP
 
-from scripts.fileio import ClientPemFile
+from scripts.fileio import ClientPemFile, FtpFilesDownloadManager
 
 DEFAULT_PORT = 5103
 
@@ -26,9 +27,11 @@ class Client:
         self.client.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, True)
         self.client.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, True)
         socket.setdefaulttimeout(30)
+        self._is_linked = False  # 内部连接状态特性
         self.AEC_key = None
         self.cfms_dict_to_send = {"version": 1, "request": "", "data": {}}
         self.pem_file = None
+        self.ftp_port = None  # 会在主逻辑文件中重新赋值
 
     def cfms_AES_encrypt(self, data):
         """AES加密"""
@@ -51,9 +54,12 @@ class Client:
             more = self.client.recv(1024)
             primary_data += more
             if len(more) < 1024:
-                return json.loads(self.cfms_AES_decrypt(primary_data))
+                recv = json.loads(self.cfms_AES_decrypt(primary_data))
+                print(recv)
+                return recv
 
     def __cfms_send(self, request):
+        print(request)
         self.client.sendall(self.cfms_AES_encrypt(json.dumps(request)))
         return True
 
@@ -93,6 +99,8 @@ class Client:
 
             server_response = json.loads(self.cfms_AES_decrypt(self.client.recv(1024)))
             if server_response['code'] == 0:
+                self._is_linked = True
+                self.ftp_host = host
                 return {"clientState": True, "address": (host, port),
                         "isFirstTimeConnection": first_time_connection, "public_key": public_key}
         except (TypeError, ValueError, OSError, UnboundLocalError, ConnectionRefusedError, ConnectionError) as e:
@@ -102,6 +110,7 @@ class Client:
 
     def set_auth(self, user: str, token: str):
         """全局设置auth"""
+        self.ftp_password = token
         account = {"username": user, "token": token}
         self.cfms_dict_to_send.setdefault("auth", {}).update(account)
 
@@ -122,33 +131,55 @@ class Client:
     def cfms_send_request(self, request: str, data: dict):
         try:
             to_send = self.cfms_dict_to_send.copy()
-            to_send.update({"request": f"{request!s}", "data": data})
+            to_send.update({"request": request, "data": data})
             self.__cfms_send(to_send)
             return {"state": True, "recv": self.recv_data}
         except (TimeoutError, TypeError, ValueError, OSError, ConnectionRefusedError, ConnectionError) as e:
             return {"state": False, "error": e}
 
+    recv_data = property(cfms_recvall, )
+
     def retry(self):
         """重置连接"""
+        self._is_linked = False
         self.close_connection()
         self.client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.client.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, True)
         self.client.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, True)
-        socket.setdefaulttimeout(40)
+        self.client.settimeout(40)
 
     def close_connection(self):
         """关闭连接"""
         to_send = {"version": 1, "request": "disconnect"}
+        self.client.settimeout(3)  # 若尝试安全关闭时超时，至多等待3s
         try:
-            self.__cfms_send(to_send)  # 可能抛出异常的位置
+            if self._is_linked:
+                self.__cfms_send(to_send)  # 可能抛出异常的位置
+                self.client.shutdown(socket.SHUT_RDWR)
             self.client.close()
-        except (TypeError, OSError) as e:
+        except (TypeError, OSError, TimeoutError) as e:
             self.client.close()
             print("Socket has been closed directly!", e)
         else:
             print("Socket has been closed safely.")
 
-    recv_data = property(cfms_recvall, )
+    def ftp_client(self, **kwargs):
+        ftp_action = kwargs["action"]
+        ftp_user = kwargs["task"]
+        ftp_file_name = kwargs["file_name"]
+        ftp_file_id = kwargs["file_id"]
+        ftp_password = self.ftp_password
+        ftp_w_file = FtpFilesDownloadManager()
+
+        ftp_obj = FTP()
+        ftp_obj.connect(self.ftp_host, self.ftp_port)
+        ftp_obj.login(user=ftp_user, passwd=ftp_password)
+
+        if ftp_action == "read":
+            self.cfms_send_request(request="operateFile", data={"file_id": ftp_file_id, "action": "read"})
+            print(self.recv_data)
+            # ftp_w_file.set_file(ftp_file_name)
+            # while True:
 
 
 class ClientSubThread(QThread, Client):
@@ -177,10 +208,11 @@ class ClientSubThread(QThread, Client):
             self.signal.emit(data_0)
 
         elif self.sub_thread_action == 1:
-            data_1 = self.cfms_user_login(self.sub_thread_args["name"], self.sub_thread_args["password"])
+            data_1 = self.cfms_user_login(username=self.sub_thread_args["name"],
+                                          password=self.sub_thread_args["password"])
             self.signal.emit(data_1)
 
         elif self.sub_thread_action == 2:
-            data_2 = self.cfms_send_request(self.sub_thread_args["request"],
-                                            self.sub_thread_args.setdefault("data", {}))
+            data_2 = self.cfms_send_request(request=self.sub_thread_args["request"],
+                                            data=self.sub_thread_args.setdefault("data", {}))
             self.signal.emit(data_2)
