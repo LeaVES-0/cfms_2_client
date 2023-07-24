@@ -4,7 +4,7 @@
 # @Author  : LeaVES
 # @FileName: client_thread.py
 # coding: utf-8
-
+import ftplib
 import hashlib
 import json
 import socket
@@ -14,7 +14,7 @@ from Crypto.PublicKey import RSA
 from Crypto.Random import get_random_bytes
 from Crypto.Util.Padding import pad, unpad
 from PyQt6.QtCore import *
-from ftplib import FTP
+import ssl
 
 from scripts.fileio import ClientPemFile, FtpFilesDownloadManager
 
@@ -23,6 +23,7 @@ DEFAULT_PORT = 5103
 
 class Client:
     def __init__(self):
+        ftplib.FTP_TLS.ssl_version = ssl.PROTOCOL_TLSv1_2
         self.client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.client.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, True)
         self.client.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, True)
@@ -110,7 +111,6 @@ class Client:
 
     def set_auth(self, user: str, token: str):
         """全局设置auth"""
-        self.ftp_password = token
         account = {"username": user, "token": token}
         self.cfms_dict_to_send.setdefault("auth", {}).update(account)
 
@@ -128,7 +128,7 @@ class Client:
             print(e)
             return {"loginState": False, "error": e}
 
-    def cfms_send_request(self, request: str, data: dict):
+    def _cfms_send_request(self, request: str, data: dict):
         try:
             to_send = self.cfms_dict_to_send.copy()
             to_send.update({"request": request, "data": data})
@@ -139,7 +139,7 @@ class Client:
 
     recv_data = property(cfms_recvall, )
 
-    def retry(self):
+    def reset_sock(self):
         """重置连接"""
         self._is_linked = False
         self.close_connection()
@@ -151,41 +151,45 @@ class Client:
     def close_connection(self):
         """关闭连接"""
         to_send = {"version": 1, "request": "disconnect"}
-        self.client.settimeout(3)  # 若尝试安全关闭时超时，至多等待3s
+        self.client.settimeout(5)  # 若尝试安全关闭时超时，至多等待5s
         try:
             if self._is_linked:
                 self.__cfms_send(to_send)  # 可能抛出异常的位置
-                self.client.shutdown(socket.SHUT_RDWR)
-            self.client.close()
+                self.client.shutdown(2)
+            self.client.close()  # 释放socket
         except (TypeError, OSError, TimeoutError) as e:
             self.client.close()
             print("Socket has been closed directly!", e)
         else:
             print("Socket has been closed safely.")
 
-    def ftp_client(self, **kwargs):
-        ftp_action = kwargs["action"]
-        ftp_user = kwargs["task"]
-        ftp_file_name = kwargs["file_name"]
-        ftp_file_id = kwargs["file_id"]
-        ftp_password = self.ftp_password
-        ftp_w_file = FtpFilesDownloadManager()
-
-        ftp_obj = FTP()
-        ftp_obj.connect(self.ftp_host, self.ftp_port)
-        ftp_obj.login(user=ftp_user, passwd=ftp_password)
-
-        if ftp_action == "read":
-            self.cfms_send_request(request="operateFile", data={"file_id": ftp_file_id, "action": "read"})
-            print(self.recv_data)
-            # ftp_w_file.set_file(ftp_file_name)
-            # while True:
+    def ftp_client(self, action, task_id, task_token, ftp_file_name, file_name):
+        ftp_file = FtpFilesDownloadManager()
+        ftp_obj = ftplib.FTP_TLS()
+        try:
+            ftp_obj.debug(2)
+            print(self.ftp_host, self.ftp_port)
+            ftp_obj.connect(host=str(self.ftp_host), port=int(self.ftp_port))
+            ftp_obj.login(user=task_id, passwd=task_token)
+            ftp_obj.prot_p()
+            print("FTP started!")
+            if action == "read":
+                sock, size = ftp_obj.ntransfercmd(f"RETR {ftp_file_name}")
+                ftp_file.set_file(file_name)
+                if ftp_file.write_file(sock, size):
+                    ftp_obj.voidresp()
+                    ftp_obj.quit()
+                    print("FTP finished.")
+        except ftplib.all_errors as e:
+            print(e)
+        return {"state": True}
 
 
 class ClientSubThread(QThread, Client):
     """子线程"""
     # 信号必须在此定义
     signal = pyqtSignal(dict, name="ClientSubThread")
+    ftp_signal = pyqtSignal(dict, name="FTP_SubThread")
 
     def __init__(self):
         """action
@@ -196,23 +200,28 @@ class ClientSubThread(QThread, Client):
         self.sub_thread_args = None
         self.sub_thread_action = None
 
-    def load_sub_thread(self, action: int = 2, **kwargs):
+    def load_sub_thread(self, action: int = 2, *args, **kwargs):
         self.sub_thread_action = action
-        self.sub_thread_args = kwargs
+        self.sub_thread_kwargs = kwargs
+        self.sub_thread_args = args
 
     def run(self):
         if self.sub_thread_action == 0:
-            address = self.sub_thread_args["address"]
+            address = self.sub_thread_kwargs["address"]
             tran_address = (str(address[0]), int(address[1]))
             data_0 = self.connect_cfms_server(*tran_address)
             self.signal.emit(data_0)
 
         elif self.sub_thread_action == 1:
-            data_1 = self.cfms_user_login(username=self.sub_thread_args["name"],
-                                          password=self.sub_thread_args["password"])
+            data_1 = self.cfms_user_login(username=self.sub_thread_kwargs["name"],
+                                          password=self.sub_thread_kwargs["password"])
             self.signal.emit(data_1)
 
         elif self.sub_thread_action == 2:
-            data_2 = self.cfms_send_request(request=self.sub_thread_args["request"],
-                                            data=self.sub_thread_args.setdefault("data", {}))
+            data_2 = self._cfms_send_request(request=self.sub_thread_kwargs["request"],
+                                             data=self.sub_thread_kwargs.setdefault("data", {}))
             self.signal.emit(data_2)
+
+        elif self.sub_thread_action == 3:
+            ftp_signal = self.ftp_client(*self.sub_thread_args)
+            self.ftp_signal.emit(ftp_signal)

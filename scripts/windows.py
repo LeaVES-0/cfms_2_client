@@ -217,12 +217,10 @@ class MainUI(ShowWindows, MainWindow):
     def __init__(self, **kwargs):
         super(MainUI, self).__init__()
         self.setup_ui(self)
-        self.get_file_function = kwargs["functions"]["get_files_func"]  # 从别处传来的函数们
-        self.file_rename_action = kwargs["functions"]["file_rename_action"]
         self.client_thread = kwargs["thread"]
         self.home_page = HomePage("home")
-        self.file_page = FilePage("file", functions={'get_file_function': self.get_file_function,
-                                                     'file_rename_function': self.file_rename_action})
+        self.file_page = FilePage("file", functions=kwargs["functions"])
+        self.get_files_function = kwargs["functions"]["get_files_function"]
         # 在导航栏添加组件
         self.addSubInterface(self.home_page, FluentIcon.HOME_FILL,
                              lambda: self.stackWidget.setCurrentWidget(self.home_page), "Home")
@@ -234,7 +232,7 @@ class MainUI(ShowWindows, MainWindow):
 
     def show_file_page(self):
         self.stackWidget.setCurrentWidget(self.file_page)
-        self.get_file_function(True)
+        self.get_files_function()
 
     def set_interface_theme(self, interface_theme: str = "LIGHT"):
         if interface_theme == "DARK":

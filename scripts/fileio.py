@@ -7,6 +7,7 @@
 
 import json
 import pathlib
+import sys
 
 DEFAULT_PEM_DIR = "data/saved_certs"
 DEFAULT_DATA_DIR = "data"
@@ -52,7 +53,27 @@ class FtpFilesDownloadManager:
         pathlib.Path(f'./{down_path}').mkdir(parents=True, exist_ok=True)
 
     def set_file(self, file_name):
-        self.file = pathlib.Path(f'{DEFAULT_DOWNLOAD_PATH}/{file_name!s}.cfms_download').open(mode='wb')
+        self.file_name = file_name
+        self.file = pathlib.Path(f'{DEFAULT_DOWNLOAD_PATH}/{file_name!s}.cfms_download')
+        self.o_file = self.file.open(mode='wb')
 
-    def write_file(self, data):
-        self.file.write(data)
+    def write_file(self, sock, size):
+        n_bytes = 0
+        while True:
+            data = sock.recv(1024)
+            if not data:
+                break
+            self.o_file.write(data)
+            n_bytes += len(data)
+            print("Received", n_bytes, end='')
+            if size:
+                print(f"of {size} total bytes ({100*n_bytes/float(size):1f}%)")
+            else:
+                print("bytes", end='')
+            sys.stdout.flush()
+        print()
+        sock.shutdown(2)
+        sock.close()
+        self.o_file.close()
+        self.file.rename(f'{DEFAULT_DOWNLOAD_PATH}/{self.file_name}')
+        return True

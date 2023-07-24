@@ -20,7 +20,7 @@ class LoginWindow:
 
     def setup_ui(self, form):
         # 主窗口
-        self.horizontalLayout = QHBoxLayout(self)
+        self.horizontalLayout = QHBoxLayout(form)  # 全局布局
         self.horizontalLayout.setContentsMargins(0, 0, 0, 0)
         self.horizontalLayout.setSpacing(0)
         self.widget = QWidget(form)
@@ -41,12 +41,12 @@ class LoginWindow:
         self.horizontalLayout.addWidget(self.widget)
 
         # 背景图
+        self.__init_vertical_qvboxlayout_2()
         self.label = QLabel()
         self.label.setText("")
         self.label.setObjectName("label")
         self.label.lower()
         self.horizontalLayout.addWidget(self.label)
-        self.__init_vertical_qvboxlayout_2()
         self.re_set_text()
 
     def __init_grid_layout_server(self):

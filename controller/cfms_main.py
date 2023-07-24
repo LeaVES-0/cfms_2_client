@@ -18,20 +18,21 @@ from scripts.client_thread import ClientSubThread
 from scripts.windows import LoginUI, MainUI, MessageDisplay, info_message_display
 
 
-class MainClient(QObject):
+class MainClient:
     """客户端主类"""
-    main_signal = pyqtSignal(object, name="MainClient")
 
     def __init__(self):
-        super().__init__(None)
         self.sub_thread = ClientSubThread()
         self.usermanager = CfmsUserManager()
         self.QtApp = QApplication(sys.argv)
         self.login_w = LoginUI(thread=self.sub_thread)
-        self.main_w = MainUI(functions={'get_files_func': self.get_dir, 'file_rename_action': self.file_rename_action},
+        self.main_w = MainUI(functions={'get_files_function': self.get_dir,
+                                        'file_rename_function': self.file_rename_action,
+                                        'operate_file_function': self.operate_file_function},
                              thread=self.sub_thread)
         self.public_key = None
         self._is_cancel_link = False  # 是否取消连接的内部特性
+        self.files_information = []
         translator = FluentTranslator(QLocale())
         self.login_w.setLoginState(0)
         self.QtApp.installTranslator(translator)
@@ -60,15 +61,15 @@ class MainClient(QObject):
             self.close_connection_function()
 
     def close_connection_function(self):
+        self.sub_thread.reset_sock()
         self.login_w.setLoginState(0)
-        self.sub_thread.retry()
         info_message_display(self.login_w, information_type="info", whereis="TOP_LEFT", title="断开了与服务器的连接")
         self.login_w.connectedServerLabel.setVisible(False)
         self.login_w.connectedServerLabel.setText("")
 
     def cancel_link(self):
         self._is_cancel_link = True
-        self.sub_thread.retry()
+        self.sub_thread.reset_sock()
         info_message_display(self.login_w, information_type="info", whereis="TOP_LEFT", title="已取消", )
 
     def __login_ui_set_buttons(self):
@@ -151,7 +152,7 @@ class MainClient(QObject):
                                      information=f"密码错误:{msg!s}")
         elif not signal["loginState"]:
             # 其他异常
-            info_message_display(self.main_w, information_type="error", whereis="TOP_LEFT", title="错误",
+            info_message_display(self.login_w, information_type="error", whereis="TOP_LEFT", title="错误",
                                  information=f"{signal['error']!s}")
         self.sub_thread.signal.disconnect(self.__check_login_state)  # 不管登录成功与否,都断开信号槽连接
 
@@ -187,18 +188,16 @@ class MainClient(QObject):
             self.sub_thread.signal.connect(self.__check_login_state)
             self.sub_thread.start()
 
-    def get_dir(self, root_dir: bool = False, dir_id: str = None):
+    def get_dir(self, dir_id: str = None):
         self.main_w.file_page.loadProgressBar.setVisible(True)
         try:
             self.sub_thread.signal.disconnect()
-            self.main_signal.disconnect()
         except TypeError:
             pass
-        self.main_signal.connect(self.main_w.file_page.set_file_tree_list)
 
         def transform_file_dict(recv: dict) -> tuple:
             """转化为列表并返回"""
-            files_information = []
+            self.files_information = []
             del recv["code"]
             files_id = list(recv["dir_data"].keys())
             for index, i in enumerate(list(recv["dir_data"].values())):
@@ -223,11 +222,12 @@ class MainClient(QObject):
                 file_info = [i.get("name", "Untitled"), i.get("type", "Unknown"),
                              f_size, time_string, i.get("permission", "Unknown"),
                              files_id[index]]
-                files_information.append(file_info)
-                for file in files_information:
+                if file_info[-1]:
+                    self.files_information.append(file_info)
+                for file in self.files_information:
                     if file[1] == "dir":
                         file[2] = ""
-            return (files_information,)
+            return (self.files_information,)
 
         def __get_recv(recv):
             _timer = threading.Timer(1, lambda: self.main_w.file_page.loadProgressBar.setVisible(False))
@@ -235,7 +235,7 @@ class MainClient(QObject):
             if recv["state"]:
                 if recv["recv"]["code"] == 0:
                     result = transform_file_dict(recv["recv"])
-                    self.main_signal.emit(result)
+                    self.main_w.file_page.set_file_tree_list(result)
                     _timer.start()
             else:
                 info_message_display(self.main_w, information_type="error", whereis="TOP_LEFT", title="错误",
@@ -243,7 +243,7 @@ class MainClient(QObject):
                 _timer.start()
 
         self.sub_thread.signal.connect(__get_recv)
-        if root_dir:
+        if not dir_id:
             self.sub_thread.load_sub_thread(request="getRootDir")
             self.sub_thread.start()
         else:
@@ -253,7 +253,6 @@ class MainClient(QObject):
     def file_rename_action(self, data, file_id: str, obj_type: str):
         try:
             self.sub_thread.signal.disconnect()
-            self.main_signal.disconnect()
         except TypeError:
             pass
 
@@ -268,7 +267,33 @@ class MainClient(QObject):
             self.sub_thread.load_sub_thread(request="operateFile", data={"file_id": file_id, "action": 'rename',
                                                                          'new_filename': data})
         self.sub_thread.start()
-        print("called")
+
+    def operate_file_function(self, file_action: str, file_index: int, file_id: str):
+        real_file_name = ''
+        try:
+            self.sub_thread.signal.disconnect()
+        except TypeError:
+            pass
+
+        def __get_recv(recv):
+            nonlocal real_file_name
+            if recv["state"]:
+                if recv["recv"]["code"] == 0:
+                    real_file_name = self.files_information[file_index][0]
+                    task_id, task_token, ftp_file_name = recv["recv"]["data"]["task_id"],\
+                        recv["recv"]["data"]["task_token"], recv["recv"]["data"]["t_filename"]
+                    self.sub_thread.load_sub_thread(3, file_action, task_id, task_token,
+                                                    ftp_file_name, real_file_name)
+                    self.sub_thread.start()
+
+        def __ftp_respond(signal):
+            if signal['state']:
+                info_message_display(self.main_w, title="下载完成", information=f"file name:{real_file_name}.")
+        self.sub_thread.ftp_signal.connect(__ftp_respond)
+
+        self.sub_thread.signal.connect(__get_recv)
+        self.sub_thread.load_sub_thread(request="operateFile", data={"action": file_action, "file_id": file_id})
+        self.sub_thread.start()
 
     def run(self, debug: bool = False):
         self.login_w.loginUI()
