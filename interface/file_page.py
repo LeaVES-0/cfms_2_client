@@ -14,7 +14,8 @@ class PrimaryFilePage:
     """文件管理目录"""
 
     def __init__(self):
-        self.dir_path = ["/"]
+        self.path = [None, ]
+        self.current_path = None
         self.rename_arg = False
 
     def setup_ui(self, args):
@@ -50,6 +51,26 @@ class PrimaryFilePage:
         self.titleLabel.setContentsMargins(30, 20, 0, 0)
         self.verticalLayout_0.addWidget(self.titleLabel)
 
+        self.create_new_button = PrimaryDropDownPushButton(text='新建', icon=FluentIcon.ADD)
+
+        self.upload_button = PrimaryDropDownPushButton(text='上传', icon=FluentIcon.UP)
+        upload_menu = RoundMenu(self)
+        upload_file_action = Action(FluentIcon.DOCUMENT, text='Upload file')
+        upload_file_action.triggered.connect(self.choose_file)
+        upload_folder_action = Action(FluentIcon.FOLDER_ADD, text='Upload folder')
+        upload_menu.addActions([upload_file_action, upload_folder_action])
+        self.upload_button.setMenu(upload_menu)
+
+        space_0 = QSpacerItem(200, 5)
+        self.back_dir_button = ToolButton(FluentIcon.CARE_LEFT_SOLID, self)  # 上一级,下一级
+        self.next_dir_button = ToolButton(FluentIcon.CARE_RIGHT_SOLID, self)
+        self.verticalLayout_0.addWidget(self.create_new_button, 2, 0, 1, 1)
+        self.verticalLayout_0.addWidget(self.upload_button, 2, 1, 1, 1)
+        self.verticalLayout_0.addItem(space_0, 2, 2, 1, 4)
+        self.verticalLayout_0.addWidget(self.back_dir_button, 2, 6, 1, 1)
+        self.verticalLayout_0.addWidget(self.next_dir_button, 2, 7, 1, 1)
+        self.back_dir_button.clicked.connect(lambda: self.change_dir_level(True))
+
         self.verticalLayout_2_widget = QWidget()  # 这个控件和布局用来装文件树和文件目录
         self.verticalLayout_2 = QHBoxLayout()
         self.verticalLayout_2_widget.setLayout(self.verticalLayout_2)
@@ -68,6 +89,7 @@ class PrimaryFilePage:
         self.table_view.setObjectName("table_file_view")
         self.table_view.setWordWrap(True)
         self.table_view.setColumnCount(5)
+        self.table_view.setHorizontalHeaderLabels(['FileName', 'Type', 'Size', 'Create Date', 'Permission'])  # 行标题
         self.table_view.cellDoubleClicked.connect(self.into_dir_action)
         self.table_view.cellChanged.connect(self.rename_action)
         self.table_view.clear()
@@ -85,12 +107,17 @@ class PrimaryFilePage:
         self.verticalLayout.addWidget(self.verticalLayout_0_widget)
         self.verticalLayout.addWidget(self.verticalLayout_2_widget)
 
+    def choose_file(self):
+        get_filename_path, ok = QFileDialog.getOpenFileName(self, "选取单个文件", "C:/", "All Files (*);")
+        if ok:
+            print(get_filename_path)
+
     def file_list_button(self, pos):
         """文件按键"""
         row = 0
         for i in self.table_view.selectionModel().selection().indexes():
             row = i.row()
-        file_id = self.file_information[row][-1]
+        file_id = self.file_information[row]["file_id"]
         screen_pos = self.table_view.mapToGlobal(pos)  # 转换坐标系
         list_item_menu = RoundMenu(self)
         copy_action = Action(FluentIcon.COPY, text='Copy')
@@ -99,7 +126,7 @@ class PrimaryFilePage:
         list_item_menu.addActions([copy_action, cut_action, remove_action])
         list_item_menu.addSeparator()
         download_action = Action(FluentIcon.DOWNLOAD, text="Download")
-        if self.file_information[row][1] == "file":
+        if self.file_information[row]["type"] == "file":
             list_item_menu.addAction(download_action)
         download_action.triggered.connect(lambda: self.operate_file_function("read", row, file_id))
         list_item_menu.exec(screen_pos, ani=True)
@@ -134,22 +161,39 @@ class PrimaryFilePage:
         self.table_view.verticalHeader().setDefaultSectionSize(60)
         # 批量设置表格项
         for row, file_info in enumerate(self.file_information):
-            file_type = file_info[1]
+            file_type = file_info["type"]
             for column in range(5):
-                self.table_view.setItem(row, column, self.__create_list_item(file_info[column], column, file_type))
+                file_info_list = [file_info["name"], file_info["type"], file_info["transformed_size"],
+                                  file_info["create_time"], file_info["permission"]]
+                self.table_view.setItem(row, column, self.__create_list_item(file_info_list[column], column, file_type))
         self.table_view.setHorizontalHeaderLabels(['FileName', 'Type', 'Size', 'Create Date', 'Permission'])  # 行标题
+
+    def change_dir_level(self, action: bool):
+        if action:
+            if len(self.path) > 1:
+                self.current_path = self.path[-2]
+                del self.path[-1]
+                if not self.current_path:
+                    self.get_files_function()
+                else:
+                    self.get_files_function(self.current_path[0])
+            else:
+                self.get_files_function()
 
     def into_dir_action(self, row, column):
         self.rename_arg = True
-        file_obj = self.file_information[row]
-        print("clicked:", file_obj)
+        dir_id = self.file_information[row]["file_id"]
+        dir_name = self.file_information[row]["name"]
+        print("clicked:", dir_id)
         if not column == 0:
-            if file_obj[1] == "dir":
-                self.get_files_function(file_obj[5])
+            if self.file_information[row]["type"] == "dir":
+                self.get_files_function(dir_id)
+                self.current_path = dir_id, dir_name
+                self.path.append(self.file_information[row]["name"])
 
     def rename_action(self, row, column):
         if self.rename_arg:
             file_obj = self.file_information[row]
             data = str(self.table_view.item(row, column).text())
-            self.file_rename_function(data, file_obj[5], file_obj[1])
+            self.file_rename_function(data, file_obj["file_id"], file_obj["name"])
             self.rename_arg = False

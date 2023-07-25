@@ -232,7 +232,10 @@ class MainUI(ShowWindows, MainWindow):
 
     def show_file_page(self):
         self.stackWidget.setCurrentWidget(self.file_page)
-        self.get_files_function()
+        if not self.file_page.current_path:
+            self.get_files_function()
+        else:
+            self.get_files_function(self.file_page.current_path[0])
 
     def set_interface_theme(self, interface_theme: str = "LIGHT"):
         if interface_theme == "DARK":

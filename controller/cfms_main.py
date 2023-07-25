@@ -5,6 +5,7 @@
 # @FileName: cfms_main.py
 # coding: utf-8
 
+import os
 import sys
 import threading
 import time
@@ -147,7 +148,7 @@ class MainClient:
 
             elif recv_from_server["code"] == 401:
                 # 登录失败, 密码错误
-                msg = recv_from_server["msg"]
+                msg = recv_from_server.get("msg", '')
                 info_message_display(self.login_w, information_type="warn", whereis="TOP_LEFT", title="登陆失败。",
                                      information=f"密码错误:{msg!s}")
         elif not signal["loginState"]:
@@ -158,8 +159,6 @@ class MainClient:
 
     def link_server_function(self, address: tuple):
         """连接服务器"""
-        self.login_w.link_server_button.setEnabled(False)
-        self.login_w.link_cancel_button.setEnabled(True)
         if not address[0] or not address[1]:
             info_message_display(self.login_w, information_type="warn", whereis="TOP_LEFT", title="警告",
                                  information="地址不得为空")
@@ -168,6 +167,8 @@ class MainClient:
                                  information="地址格式有误")
         else:
             print("Connecting......")
+            self.login_w.link_server_button.setEnabled(False)
+            self.login_w.link_cancel_button.setEnabled(True)
             self.login_w.loadProgressBar.setVisible(True)
             try:
                 self.sub_thread.signal.disconnect()  # 再次确认断开
@@ -207,6 +208,7 @@ class MainClient:
                 except KeyError:
                     time_string = "Unknown"
                 size_units = ["B", "KB", "MB", "GB", "TB", "PB"]
+                size = "Unknown"
                 try:
                     f_size = "Unknown"
                     size = int(i["properties"].get("size", "Unknown"))
@@ -219,14 +221,16 @@ class MainClient:
                             break
                 except (ValueError, TypeError):
                     f_size = "Unknown"
-                file_info = [i.get("name", "Untitled"), i.get("type", "Unknown"),
-                             f_size, time_string, i.get("permission", "Unknown"),
-                             files_id[index]]
-                if file_info[-1]:
+                    # 名称|类型|大小|权限|原始大小|id
+                file_info = {"name": i.get("name", "Untitled"), "type": i.get("type", "Unknown"),
+                             "transformed_size": f_size, "create_time": time_string,
+                             "permission": i.get("permission", "Unknown"), "primary_size": size,
+                             "file_id": files_id[index]}
+                if file_info["file_id"]:
                     self.files_information.append(file_info)
                 for file in self.files_information:
-                    if file[1] == "dir":
-                        file[2] = ""
+                    if file["type"] == "dir":
+                        file["transformed_size"] = ""
             return (self.files_information,)
 
         def __get_recv(recv):
@@ -258,6 +262,7 @@ class MainClient:
 
         def __get_recv(recv):
             print(recv)
+            self.sub_thread.signal.disconnect(__get_recv)
 
         self.sub_thread.signal.connect(__get_recv)
         if obj_type == "dir":
@@ -268,7 +273,7 @@ class MainClient:
                                                                          'new_filename': data})
         self.sub_thread.start()
 
-    def operate_file_function(self, file_action: str, file_index: int, file_id: str):
+    def operate_file_function(self, file_action: str, file_path: str = '', file_index: int = 0, file_id: str = ''):
         real_file_name = ''
         try:
             self.sub_thread.signal.disconnect()
@@ -277,22 +282,49 @@ class MainClient:
 
         def __get_recv(recv):
             nonlocal real_file_name
+            self.sub_thread.signal.disconnect(__get_recv)
             if recv["state"]:
                 if recv["recv"]["code"] == 0:
-                    real_file_name = self.files_information[file_index][0]
-                    task_id, task_token, ftp_file_name = recv["recv"]["data"]["task_id"],\
-                        recv["recv"]["data"]["task_token"], recv["recv"]["data"]["t_filename"]
-                    self.sub_thread.load_sub_thread(3, file_action, task_id, task_token,
-                                                    ftp_file_name, real_file_name)
+                    # task
+                    task_id, task_token = recv["recv"]["data"]["task_id"], recv["recv"]["data"]["task_token"]
+                    if file_action == "read":  # download
+                        real_file_name = self.files_information[file_index]["name"]  # 真实文件名
+                        file_size = self.files_information[file_index]["primary_size"]  # 文件大小
+                        ftp_file_name = recv["recv"]["data"]["t_filename"]  # ftp文件名
+                        self.sub_thread.load_sub_thread(3, file_action, task_id, task_token,
+                                                        ftp_file_name=ftp_file_name, file_name=real_file_name,
+                                                        file_size=file_size)
+                    elif file_action == "write":  # upload
+                        self.sub_thread.load_sub_thread(3, file_action, task_id, task_token,
+                                                        file_name=file_path)
                     self.sub_thread.start()
 
-        def __ftp_respond(signal):
-            if signal['state']:
-                info_message_display(self.main_w, title="下载完成", information=f"file name:{real_file_name}.")
-        self.sub_thread.ftp_signal.connect(__ftp_respond)
-
+        def __ftp_respond(signal):  # 结果处理
+            if file_action == "read":
+                if signal['state']:
+                    info_message_display(self.main_w, title="下载完成", information=f"{real_file_name}.")
+                else:
+                    if signal["error"] == "FEE":
+                        info_message_display(self.main_w, title="注意", information="文件已存在")
+                    else:
+                        info_message_display(self.main_w, title="未知错误", information=signal["error"])
+            if file_action == "write":
+                if signal['state']:
+                    info_message_display(self.main_w, title="上传完成", information=f"{real_file_name}.")
+                else:
+                    if signal["error"] == "FNE":
+                        info_message_display(self.main_w, title="注意", information="文件不存在")
+                    else:
+                        info_message_display(self.main_w, title="未知错误", information=signal["error"])
+            self.sub_thread.ftp_signal.disconnect(__ftp_respond)
+        # send request
+        if file_action == "read":
+            self.sub_thread.load_sub_thread(2, request="operateFile", data={"action": file_action, "file_id": file_id})
+        elif file_action == "write":
+            self.sub_thread.load_sub_thread(2, request="operateFile", data={"action": file_action, "file_id": file_id,
+                                                                            'file_name': os.path.split(file_path)})
         self.sub_thread.signal.connect(__get_recv)
-        self.sub_thread.load_sub_thread(request="operateFile", data={"action": file_action, "file_id": file_id})
+        self.sub_thread.ftp_signal.connect(__ftp_respond)
         self.sub_thread.start()
 
     def run(self, debug: bool = False):

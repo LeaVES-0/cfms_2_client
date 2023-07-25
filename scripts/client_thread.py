@@ -163,7 +163,9 @@ class Client:
         else:
             print("Socket has been closed safely.")
 
-    def ftp_client(self, action, task_id, task_token, ftp_file_name, file_name):
+    def ftp_client(self, action: str, task_id: str, task_token: str, ftp_file_name='', file_name='',
+                   file_size: int = 0):
+        result = {}
         ftp_file = FtpFilesDownloadManager()
         ftp_obj = ftplib.FTP_TLS()
         try:
@@ -174,15 +176,20 @@ class Client:
             ftp_obj.prot_p()
             print("FTP started!")
             if action == "read":
-                sock, size = ftp_obj.ntransfercmd(f"RETR {ftp_file_name}")
-                ftp_file.set_file(file_name)
-                if ftp_file.write_file(sock, size):
-                    ftp_obj.voidresp()
-                    ftp_obj.quit()
-                    print("FTP finished.")
+                sock, size = ftp_obj.ntransfercmd(cmd=f"RETR {ftp_file_name}", rest=None)
+                result = ftp_file.write_file(file_name, sock, file_size)
+            elif action == "write":
+                sock = ftp_obj.transfercmd(cmd=f" {ftp_file_name}", rest=None)
+                result = ftp_file.read_file(file_path=file_name, sock=sock)
+            ftp_obj.quit()
+            if result["state"]:
+                print("FTP finished.")
+                return {"state": True}
+            else:
+                return {"state": False, "error": result["error"]}
         except ftplib.all_errors as e:
             print(e)
-        return {"state": True}
+            return {"state": False, "error": e}
 
 
 class ClientSubThread(QThread, Client):
@@ -223,5 +230,5 @@ class ClientSubThread(QThread, Client):
             self.signal.emit(data_2)
 
         elif self.sub_thread_action == 3:
-            ftp_signal = self.ftp_client(*self.sub_thread_args)
+            ftp_signal = self.ftp_client(*self.sub_thread_args, **self.sub_thread_kwargs)
             self.ftp_signal.emit(ftp_signal)

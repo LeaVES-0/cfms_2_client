@@ -50,30 +50,42 @@ class ClientDataFile:
 
 class FtpFilesDownloadManager:
     def __init__(self, down_path: str = DEFAULT_DOWNLOAD_PATH):
-        pathlib.Path(f'./{down_path}').mkdir(parents=True, exist_ok=True)
+        pathlib.Path(down_path).mkdir(parents=True, exist_ok=True)
+        self.path = down_path
 
-    def set_file(self, file_name):
-        self.file_name = file_name
-        self.file = pathlib.Path(f'{DEFAULT_DOWNLOAD_PATH}/{file_name!s}.cfms_download')
-        self.o_file = self.file.open(mode='wb')
-
-    def write_file(self, sock, size):
+    def write_file(self, file_name: str, sock, size: int):
         n_bytes = 0
-        while True:
-            data = sock.recv(1024)
-            if not data:
-                break
-            self.o_file.write(data)
-            n_bytes += len(data)
-            print("Received", n_bytes, end='')
-            if size:
-                print(f"of {size} total bytes ({100*n_bytes/float(size):1f}%)")
-            else:
-                print("bytes", end='')
-            sys.stdout.flush()
+        if pathlib.Path(f'{self.path}/{file_name}').exists():
+            file = pathlib.Path(f'{DEFAULT_DOWNLOAD_PATH}/{file_name!s}.cfms_download')
+            o_file = file.open(mode='wb')
+            while True:
+                data = sock.recv(1024)
+                if not data:
+                    break
+                o_file.write(data)
+                n_bytes += len(data)
+                print("Received", n_bytes, end='')
+                if size:
+                    print(f"of {size} total bytes ({(100*n_bytes/float(size)):1f}%)")
+                else:
+                    print("bytes", end='')
+                sys.stdout.flush()
+        else:
+            return {'state': False, 'error': "FEE"}
         print()
         sock.shutdown(2)
         sock.close()
-        self.o_file.close()
-        self.file.rename(f'{DEFAULT_DOWNLOAD_PATH}/{self.file_name}')
-        return True
+        o_file.close()
+        file.rename(f'{self.path}/{file_name}')
+        return {'state': True}
+
+    @staticmethod
+    def read_file(file_path: str, sock):
+        file_obj = pathlib.Path(file_path)
+        if file_obj.exists():
+            data = file_obj.read_bytes()
+        else:
+            return {'state': False, 'error': "FNE"}
+        sock.sendall(data)
+        sock.shutdown(2)
+        sock.close()

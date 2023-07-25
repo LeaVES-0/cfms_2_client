@@ -2,6 +2,7 @@
 /.idea
 /__pycache__
 *.log
+/download
 /interface/__pycache__
 /controller/__pycache__
 /scripts/__pycache__
