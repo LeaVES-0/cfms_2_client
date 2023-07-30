@@ -58,7 +58,7 @@ class LoginWindow:
         self.GridLayoutFServer.setObjectName("GridLayoutFServer")
         # 服务器地址E
         self.serverAdLE = EditableComboBox()
-        self.serverAdLE.setClearButtonEnabled(True)
+        # self.serverAdLE.setClearButtonEnabled(True)
         self.serverAdLE.setObjectName("serverAdLE")
         # 端口L
         self.GridLayoutFServer.addWidget(self.serverAdLE, 1, 0, 1, 1)
@@ -69,7 +69,7 @@ class LoginWindow:
         # 端口E
         self.serverPortLE = LineEdit()
         self.serverPortLE.setPlaceholderText("")
-        self.serverPortLE.setClearButtonEnabled(True)
+        # self.serverPortLE.setClearButtonEnabled(True)
         self.serverPortLE.setObjectName("serverPortLE")
         self.GridLayoutFServer.addWidget(self.serverPortLE, 1, 1, 1, 1)
         # 端口L
@@ -176,9 +176,8 @@ class LoginWindow:
         spacer_item2 = QSpacerItem(20, 15, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
         self.verticalLayout_2.addItem(spacer_item2)
 
-        self.loadProgressBar = IndeterminateProgressBar()
+        self.loadProgressBar = IndeterminateProgressBar(start=False)
         self.verticalLayout_2.addWidget(self.loadProgressBar)
-        self.loadProgressBar.setVisible(False)
 
         self.connectedServerLabel = PushButton()
         self.verticalLayout_2.addWidget(self.connectedServerLabel)

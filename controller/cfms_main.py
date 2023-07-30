@@ -7,7 +7,6 @@
 
 import os
 import sys
-import threading
 import time
 
 from PyQt6.QtCore import *
@@ -15,8 +14,9 @@ from PyQt6.QtWidgets import QApplication
 from qfluentwidgets import FluentTranslator, Theme
 
 from controller.cfms_user import CfmsUserManager
-from scripts.client_thread import ClientSubThread
-from scripts.windows import LoginUI, MainUI, MessageDisplay, info_message_display
+from scripts.client_thread import ClientSubThread, ClientFtpThread
+from scripts.method import info_message_display
+from scripts.windows import LoginUI, MainUI, MessageDisplay
 
 
 class MainClient:
@@ -27,9 +27,11 @@ class MainClient:
         self.usermanager = CfmsUserManager()
         self.QtApp = QApplication(sys.argv)
         self.login_w = LoginUI(thread=self.sub_thread)
-        self.main_w = MainUI(functions={'get_files_function': self.get_dir,
-                                        'file_rename_function': self.file_rename_action,
-                                        'operate_file_function': self.operate_file_function},
+        self.main_w = MainUI(functions={'get_files_function': self.get_dir_function,
+                                        'rename_file_function': self.rename_file_function,
+                                        'download_file_function': self.download_file_function,
+                                        'delete_file_function': self.delete_file_function,
+                                        'upload_new_file_function': self.upload_new_file_function},
                              thread=self.sub_thread)
         self.public_key = None
         self._is_cancel_link = False  # 是否取消连接的内部特性
@@ -39,6 +41,9 @@ class MainClient:
         self.QtApp.installTranslator(translator)
 
         self.__login_ui_set_buttons()
+        server_items = [i[0] for i in self.usermanager.saved_servers]
+        self.login_w.serverAdLE.addItems(server_items)
+        self.login_w.serverAdLE.setCurrentIndex(0)
 
     def show_public_key_meg(self):
         title = 'The Public Key of the Server:'
@@ -88,6 +93,7 @@ class MainClient:
         state = args["clientState"]
         server_address = args["address"]
         if state:
+            self.ftp_host = server_address[0]
             print(f"Server state: 0. \nLink successful.")
             info_message_display(self.login_w, information_type="info", whereis="TOP_LEFT", title="连接成功!")
             if args["isFirstTimeConnection"]:
@@ -96,21 +102,21 @@ class MainClient:
             self.login_w.setLoginState(1)
             self.login_w.connectedServerLabel.setVisible(True)
             self.login_w.connectedServerLabel.setText(f"已连接到 {server_address[0]}:{server_address[1]}")
-            self.login_w.loadProgressBar.setVisible(False)
-            self.usermanager.remember_linked_server(address=list(server_address))
+            self.login_w.loadProgressBar.stop()
+            self.usermanager.remember_linked_server(address=list(server_address))  # 储存连接成功的服务器信息
+            self.login_w.userNameLE.addItems(self.usermanager.saved_users)
+            self.login_w.userNameLE.setCurrentIndex(0)
 
         else:
+            self.login_w.link_server_button.setEnabled(True)
+            self.login_w.link_cancel_button.setEnabled(False)
+            self.login_w.loadProgressBar.stop()
             if not args["isSameKey"]:
-                self.login_w.link_server_button.setEnabled(True)
-                self.login_w.link_cancel_button.setEnabled(False)
-                self.login_w.loadProgressBar.setVisible(False)
                 info_message_display(self.login_w, duration_time=1500, information_type="warn", whereis="TOP_RIGHT",
                                      title=" 公钥异常")
                 self.__diff_public_key_meg()
             else:
-                self.login_w.link_server_button.setEnabled(True)
-                self.login_w.link_cancel_button.setEnabled(False)
-                self.login_w.loadProgressBar.setVisible(False)
+
                 if not self._is_cancel_link:
                     info_message_display(self.login_w, duration_time=2000, information_type="error",
                                          whereis="TOP_RIGHT", title="错误", information=f"{args['error']}")
@@ -124,9 +130,10 @@ class MainClient:
             if recv_from_server["code"] == 0:
                 # 登录成功
                 self.login_w.login_finished = True
-                self.sub_thread.ftp_port = recv_from_server["ftp_port"]  # ftp 端口
+                self.ftp_port = recv_from_server["ftp_port"]  # ftp 端口
                 print("Login successful!")
-                info_message_display(self.main_w, information_type="info", whereis="TOP", title="登录成功!")
+                info_message_display(self.main_w, information_type="info", whereis="TOP",
+                                     title="登录成功!", duration_time=1000)
                 login_information = signal['account']  # 存有用户账户的元组
                 # 同步主题
                 if self.login_w.theme == Theme.DARK:
@@ -166,10 +173,10 @@ class MainClient:
             info_message_display(self.login_w, information_type="warn", whereis="TOP_LEFT", title="警告",
                                  information="地址格式有误")
         else:
-            print("Connecting......")
             self.login_w.link_server_button.setEnabled(False)
             self.login_w.link_cancel_button.setEnabled(True)
-            self.login_w.loadProgressBar.setVisible(True)
+            self.login_w.loadProgressBar.start()
+            print("Connecting......")
             try:
                 self.sub_thread.signal.disconnect()  # 再次确认断开
             except TypeError:
@@ -189,8 +196,9 @@ class MainClient:
             self.sub_thread.signal.connect(self.__check_login_state)
             self.sub_thread.start()
 
-    def get_dir(self, dir_id: str = None):
-        self.main_w.file_page.loadProgressBar.setVisible(True)
+    def get_dir_function(self, dir_id: str = None):
+        self.current_dir_id = dir_id
+        self.main_w.file_page.loadProgressBar.start()
         try:
             self.sub_thread.signal.disconnect()
         except TypeError:
@@ -233,38 +241,44 @@ class MainClient:
                         file["transformed_size"] = ""
             return (self.files_information,)
 
-        def __get_recv(recv):
-            _timer = threading.Timer(1, lambda: self.main_w.file_page.loadProgressBar.setVisible(False))
-            self.sub_thread.signal.disconnect(__get_recv)
+        def get_recv(recv):
+            self.sub_thread.signal.disconnect(get_recv)
+            # _timer = threading.Timer(1, self.main_w.file_page.loadProgressBar.stop)
+            # _timer.start()
+            self.main_w.file_page.loadProgressBar.stop()
             if recv["state"]:
                 if recv["recv"]["code"] == 0:
                     result = transform_file_dict(recv["recv"])
                     self.main_w.file_page.set_file_tree_list(result)
-                    _timer.start()
+                    # _timer.start()
+                elif recv["recv"]["code"] == 404:
+                    # 失败 设置当前目录为前一次所处目录
+                    if self.main_w.file_page.last_dir_path:
+                        self.current_dir_id = self.main_w.file_page.last_dir_path[0]
+                    else:
+                        self.current_dir_id = None
+                    self.main_w.file_page.current_path = self.main_w.file_page.last_dir_path
+                    info_message_display(self.main_w, information_type="error", whereis="TOP_LEFT", title="错误",
+                                         information="目录不存在")
+                    # _timer.start()
             else:
                 info_message_display(self.main_w, information_type="error", whereis="TOP_LEFT", title="错误",
                                      information=f"获取文件时出错{recv['error']}")
-                _timer.start()
+                # _timer.start()
 
-        self.sub_thread.signal.connect(__get_recv)
+        self.sub_thread.signal.connect(get_recv)
         if not dir_id:
-            self.sub_thread.load_sub_thread(request="getRootDir")
+            self.sub_thread.load_sub_thread(request="getRootDir", data={"action": "list"})
             self.sub_thread.start()
         else:
-            self.sub_thread.load_sub_thread(request="getDir", data={"id": dir_id})
+            self.sub_thread.load_sub_thread(request="operateDir", data={"action": "list", "dir_id": dir_id})
             self.sub_thread.start()
 
-    def file_rename_action(self, data, file_id: str, obj_type: str):
+    def rename_file_function(self, data, file_id: str, obj_type: str):
         try:
             self.sub_thread.signal.disconnect()
         except TypeError:
-            pass
-
-        def __get_recv(recv):
-            print(recv)
-            self.sub_thread.signal.disconnect(__get_recv)
-
-        self.sub_thread.signal.connect(__get_recv)
+            ...
         if obj_type == "dir":
             self.sub_thread.load_sub_thread(request="operateDir", data={"dir_id": file_id, "action": 'rename',
                                                                         'new_dirname': data})
@@ -273,59 +287,97 @@ class MainClient:
                                                                          'new_filename': data})
         self.sub_thread.start()
 
-    def operate_file_function(self, file_action: str, file_path: str = '', file_index: int = 0, file_id: str = ''):
-        real_file_name = ''
+    def delete_file_function(self, file_id: str, obj_type: str):
+        try:
+            self.sub_thread.signal.disconnect()
+        except TypeError:
+            ...
+
+        def __get_recv(recv):
+            self.sub_thread.signal.disconnect(__get_recv)
+            self.get_dir_function(self.current_dir_id)
+            return recv
+
+        if obj_type == "dir":
+            self.sub_thread.load_sub_thread(request="operateDir", data={"dir_id": file_id, "action": 'delete'})
+        elif obj_type == "file":
+            self.sub_thread.load_sub_thread(request="operateFile", data={"file_id": file_id, "action": 'delete'})
+        self.sub_thread.start()
+        self.sub_thread.signal.connect(__get_recv)
+
+    def download_file_function(self, file_index: int):
         try:
             self.sub_thread.signal.disconnect()
         except TypeError:
             pass
+        ftp_task = ClientFtpThread(address=(self.ftp_host, self.ftp_port))
+        file = self.files_information[file_index]
+        file_id = file['file_id']
+        file_name = str(file['name'])
+        file_size = int(file['primary_size'])
+
+        def __ftp_respond(signal):  # 结果处理
+            ftp_task.ftp_signal.disconnect()
+            if not signal['state']:
+                if signal["error"] == "FEE":
+                    info_message_display(self.main_w, title="注意", information="文件已存在")
+                else:
+                    info_message_display(self.main_w, title="未知错误", information=signal["error"])
 
         def __get_recv(recv):
-            nonlocal real_file_name
             self.sub_thread.signal.disconnect(__get_recv)
             if recv["state"]:
                 if recv["recv"]["code"] == 0:
                     # task
-                    task_id, task_token = recv["recv"]["data"]["task_id"], recv["recv"]["data"]["task_token"]
-                    if file_action == "read":  # download
-                        real_file_name = self.files_information[file_index]["name"]  # 真实文件名
-                        file_size = self.files_information[file_index]["primary_size"]  # 文件大小
-                        ftp_file_name = recv["recv"]["data"]["t_filename"]  # ftp文件名
-                        self.sub_thread.load_sub_thread(3, file_action, task_id, task_token,
-                                                        ftp_file_name=ftp_file_name, file_name=real_file_name,
-                                                        file_size=file_size)
-                    elif file_action == "write":  # upload
-                        self.sub_thread.load_sub_thread(3, file_action, task_id, task_token,
-                                                        file_name=file_path)
-                    self.sub_thread.start()
+                    task_id = recv["recv"]["data"]["task_id"]
+                    task_token = recv["recv"]["data"]["task_token"]
+                    ftp_file_names = recv["recv"]["data"]["t_filename"]  # ftp文件名(字典)
+                    file_info = [(file_name, file_size)]  # file_info 每一项的1索引为文件大小, 0索引为文件名称
+                    ftp_task.load_ftp_obj(action="download_file",
+                                          args=(task_id, task_token, ftp_file_names, file_info, False))
+                    ftp_task.ftp_signal.connect(__ftp_respond)
+                    ftp_task.start()
 
-        def __ftp_respond(signal):  # 结果处理
-            if file_action == "read":
-                if signal['state']:
-                    info_message_display(self.main_w, title="下载完成", information=f"{real_file_name}.")
-                else:
-                    if signal["error"] == "FEE":
-                        info_message_display(self.main_w, title="注意", information="文件已存在")
-                    else:
-                        info_message_display(self.main_w, title="未知错误", information=signal["error"])
-            if file_action == "write":
-                if signal['state']:
-                    info_message_display(self.main_w, title="上传完成", information=f"{real_file_name}.")
-                else:
-                    if signal["error"] == "FNE":
-                        info_message_display(self.main_w, title="注意", information="文件不存在")
-                    else:
-                        info_message_display(self.main_w, title="未知错误", information=signal["error"])
-            self.sub_thread.ftp_signal.disconnect(__ftp_respond)
         # send request
-        if file_action == "read":
-            self.sub_thread.load_sub_thread(2, request="operateFile", data={"action": file_action, "file_id": file_id})
-        elif file_action == "write":
-            self.sub_thread.load_sub_thread(2, request="operateFile", data={"action": file_action, "file_id": file_id,
-                                                                            'file_name': os.path.split(file_path)})
+        self.sub_thread.load_sub_thread(2, request="operateFile", data={"action": "read", "file_id": file_id})
         self.sub_thread.signal.connect(__get_recv)
-        self.sub_thread.ftp_signal.connect(__ftp_respond)
         self.sub_thread.start()
+
+    def download_folder_function(self):
+        ...
+
+    def upload_new_file_function(self, file_path):
+        try:
+            self.sub_thread.signal.disconnect()
+        except TypeError:
+            pass
+        ftp_task = ClientFtpThread(address=(self.ftp_host, self.ftp_port))
+        file_name = str(os.path.basename(file_path))
+
+        def __ftp_respond(signal):
+            ftp_task.ftp_signal.disconnect(__ftp_respond)
+            self.get_dir_function(self.current_dir_id)
+
+        def __get_recv(recv):
+            self.sub_thread.signal.disconnect(__get_recv)
+            task_id = recv["recv"]["data"]["task_id"]
+            task_token = recv["recv"]["data"]["task_token"]
+            ftp_file_names = recv["recv"]["data"]["t_filename"]  # 要上传的ftp文件名(字典)
+            ftp_task.load_ftp_obj(action="upload_new_file", args=(task_id, task_token, ftp_file_names, file_path))
+            ftp_task.ftp_signal.connect(__ftp_respond)
+            ftp_task.start()
+
+        self.sub_thread.signal.connect(__get_recv)
+        self.sub_thread.load_sub_thread(2, request="createFile",
+                                        data={"directory_id": (self.current_dir_id if self.current_dir_id else ''),
+                                              "filename": file_name})
+        self.sub_thread.start()
+
+    def upload_file_function(self):
+        ...
+
+    def upload_folder_function(self):
+        ...
 
     def run(self, debug: bool = False):
         self.login_w.loginUI()

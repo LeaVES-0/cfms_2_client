@@ -10,7 +10,7 @@ from controller.cfms_main import MainClient
 
 def main():
     client = MainClient()
-    client.run(True)
+    client.run()
 
 
 if __name__ == '__main__':

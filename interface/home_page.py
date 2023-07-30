@@ -5,17 +5,21 @@
 # @FileName: Homepage.py
 # coding: utf-8
 
-from PyQt6 import QtCore, QtGui, QtWidgets
+from PyQt6.QtWidgets import *
 
 
-class PrimaryHomePage:
-    def __init__(self):
-        self.verticalLayoutWidget = QtWidgets.QWidget(parent=self)
+class HomePage(QWidget):
+    def __init__(self, object_name):
+        super().__init__(None)
+        self.setObjectName(object_name)
+
+    def setup_ui(self, args=None):
+        self.verticalLayoutWidget = QWidget(parent=self)
         self.verticalLayoutWidget.setObjectName("verticalLayoutWidget")
-        self.verticalLayout = QtWidgets.QVBoxLayout(self.verticalLayoutWidget)
+        self.verticalLayout = QVBoxLayout(self.verticalLayoutWidget)
         self.verticalLayout.setContentsMargins(0, 0, 0, 0)
         self.verticalLayout.setObjectName("verticalLayout")
-        self.titleLabel = QtWidgets.QLabel()
+        self.titleLabel = QLabel()
         self.titleLabel.setText("CFMS  2")
         self.titleLabel.setStyleSheet(
             """QLabel{
@@ -24,7 +28,7 @@ class PrimaryHomePage:
         )
         self.titleLabel.setContentsMargins(30, 20, 0, 0)
         self.verticalLayout.addWidget(self.titleLabel)
-        self.titleLabel_s = QtWidgets.QLabel()
+        self.titleLabel_s = QLabel()
         self.titleLabel_s.setText("Classified File Management System")
         self.titleLabel_s.setStyleSheet(
             """QLabel{

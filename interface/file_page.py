@@ -8,20 +8,28 @@ from PyQt6.QtCore import *
 from PyQt6.QtWidgets import *
 from qfluentwidgets import *
 
+from scripts.method import info_message_display
+
 
 # noinspection PyTypeChecker
-class PrimaryFilePage:
+class FilePage(QWidget):
     """文件管理目录"""
 
-    def __init__(self):
+    def __init__(self, object_name):
+        super().__init__(None)
+        self.setObjectName(object_name)
         self.path = [None, ]
         self.current_path = None
+        self.last_dir_path = None
         self.rename_arg = False
+        self.loadProgressBar = IndeterminateProgressBar(self, start=False)
 
-    def setup_ui(self, args):
-        self.get_files_function = args["functions"]["get_files_function"]
-        self.file_rename_function = args["functions"]["file_rename_function"]
-        self.operate_file_function = args["functions"]["operate_file_function"]
+    def setup_ui(self, functions=None):
+        self.get_files_function = functions["get_files_function"]
+        self.file_rename_function = functions["rename_file_function"]
+        self.download_file_function = functions["download_file_function"]
+        self.delete_file_function = functions["delete_file_function"]
+        self.upload_new_file_function = functions["upload_new_file_function"]
         self.verticalLayoutWidget = QWidget(self)
         self.verticalLayoutWidget.setObjectName("verticalLayoutWidget")
         size_policy = QSizePolicy()
@@ -35,8 +43,8 @@ class PrimaryFilePage:
         self.verticalLayout.setObjectName("verticalLayout")
         # self.verticalLayout.addWidget(self.verticalLayoutWidget)
 
-        self.verticalLayout_0_widget = QWidget()  # 这个控件和布局用来装标题和一些其他东西
-        self.verticalLayout_0 = QGridLayout()
+        self.verticalLayout_0_widget = QWidget(self)  # 这个控件和布局用来装标题和一些其他东西
+        self.verticalLayout_0 = QGridLayout(self)
         self.verticalLayout_0_widget.setLayout(self.verticalLayout_0)
         self.verticalLayout_0.setObjectName("verticalLayout_0")
         # self.verticalLayout_0.addWidget(self.verticalLayout_0_widget)
@@ -71,7 +79,7 @@ class PrimaryFilePage:
         self.verticalLayout_0.addWidget(self.next_dir_button, 2, 7, 1, 1)
         self.back_dir_button.clicked.connect(lambda: self.change_dir_level(True))
 
-        self.verticalLayout_2_widget = QWidget()  # 这个控件和布局用来装文件树和文件目录
+        self.verticalLayout_2_widget = QWidget(self)  # 这个控件和布局用来装文件树和文件目录
         self.verticalLayout_2 = QHBoxLayout()
         self.verticalLayout_2_widget.setLayout(self.verticalLayout_2)
         self.verticalLayout_2.setObjectName("verticalLayout_2")
@@ -88,7 +96,6 @@ class PrimaryFilePage:
         self.table_view = TableWidget()  # 创建表格
         self.table_view.setObjectName("table_file_view")
         self.table_view.setWordWrap(True)
-        self.table_view.setColumnCount(5)
         self.table_view.setHorizontalHeaderLabels(['FileName', 'Type', 'Size', 'Create Date', 'Permission'])  # 行标题
         self.table_view.cellDoubleClicked.connect(self.into_dir_action)
         self.table_view.cellChanged.connect(self.rename_action)
@@ -97,10 +104,10 @@ class PrimaryFilePage:
         # 允许打开上下文菜单
         self.table_view.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         # 绑定事件
-        self.table_view.customContextMenuRequested.connect(self.file_list_button)
         self.table_view.verticalHeader().hide()  # 表头
         self.table_view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.table_view.verticalHeader().setDefaultSectionSize(60)
+        self.table_view.customContextMenuRequested.connect(self.file_list_button)
         self.verticalLayout_2.addWidget(self.table_view, 5)
         self.table_view.setContentsMargins(10, 100, 0, 0)
 
@@ -110,7 +117,9 @@ class PrimaryFilePage:
     def choose_file(self):
         get_filename_path, ok = QFileDialog.getOpenFileName(self, "选取单个文件", "C:/", "All Files (*);")
         if ok:
-            print(get_filename_path)
+            self.upload_new_file_function(get_filename_path)
+        else:
+            info_message_display(self, information_type="info", whereis="TOP_LEFT", title="已取消", )
 
     def file_list_button(self, pos):
         """文件按键"""
@@ -118,17 +127,22 @@ class PrimaryFilePage:
         for i in self.table_view.selectionModel().selection().indexes():
             row = i.row()
         file_id = self.file_information[row]["file_id"]
+        file_type = self.file_information[row]["type"]
         screen_pos = self.table_view.mapToGlobal(pos)  # 转换坐标系
         list_item_menu = RoundMenu(self)
         copy_action = Action(FluentIcon.COPY, text='Copy')
         cut_action = Action(FluentIcon.CUT, text='Cut')
-        remove_action = Action(FluentIcon.REMOVE_FROM, text="Remove")
-        list_item_menu.addActions([copy_action, cut_action, remove_action])
+        delete_action = Action(FluentIcon.REMOVE_FROM, text="Delete")
+        list_item_menu.addActions([copy_action, cut_action, delete_action])
         list_item_menu.addSeparator()
-        download_action = Action(FluentIcon.DOWNLOAD, text="Download")
-        if self.file_information[row]["type"] == "file":
-            list_item_menu.addAction(download_action)
-        download_action.triggered.connect(lambda: self.operate_file_function("read", row, file_id))
+        download_file_action = Action(FluentIcon.DOWNLOAD, text="Download")
+        download_folder_action = Action(FluentIcon.DOWNLOAD, text="Download")
+        if file_type == "file":
+            list_item_menu.addAction(download_file_action)
+        elif file_type == "dir":
+            list_item_menu.addAction(download_folder_action)
+        download_file_action.triggered.connect(lambda: self.download_file_function(file_index=row))
+        delete_action.triggered.connect(lambda: self.delete_file_function(file_id, file_type))
         list_item_menu.exec(screen_pos, ani=True)
 
     def set_file_tree_list(self, files):
@@ -151,22 +165,29 @@ class PrimaryFilePage:
                 item.setIcon(FluentIcon.FOLDER.icon())
             elif obj_type == "file":
                 item.setIcon(FluentIcon.DOCUMENT.icon())
+            item.setToolTip(info)
         return item
 
     def __set_files_list(self, files: list):
         """设置文件列表"""
+        self.table_view.setColumnCount(5)
+        self.table_view.verticalHeader().setDefaultSectionSize(60)
         self.file_information = files
         self.table_view.clear()
         self.table_view.setRowCount(len(self.file_information))
-        self.table_view.verticalHeader().setDefaultSectionSize(60)
         # 批量设置表格项
-        for row, file_info in enumerate(self.file_information):
-            file_type = file_info["type"]
-            for column in range(5):
-                file_info_list = [file_info["name"], file_info["type"], file_info["transformed_size"],
-                                  file_info["create_time"], file_info["permission"]]
-                self.table_view.setItem(row, column, self.__create_list_item(file_info_list[column], column, file_type))
-        self.table_view.setHorizontalHeaderLabels(['FileName', 'Type', 'Size', 'Create Date', 'Permission'])  # 行标题
+        if not files:
+            self.table_view.setColumnCount(1)
+            self.table_view.setHorizontalHeaderLabels(["No Files"])  # 行标题
+        elif files:
+            self.table_view.setHorizontalHeaderLabels(['FileName', 'Type', 'Size', 'Create Date', 'Permission'])  # 行标题
+            for row, file_info in enumerate(self.file_information):
+                file_type = file_info["type"]
+                for column in range(5):
+                    file_info_list = [file_info["name"], file_info["type"], file_info["transformed_size"],
+                                      file_info["create_time"], file_info["permission"]]
+                    self.table_view.setItem(row, column,
+                                            self.__create_list_item(file_info_list[column], column, file_type))
 
     def change_dir_level(self, action: bool):
         if action:
@@ -188,6 +209,7 @@ class PrimaryFilePage:
         if not column == 0:
             if self.file_information[row]["type"] == "dir":
                 self.get_files_function(dir_id)
+                self.last_dir_path = self.current_path
                 self.current_path = dir_id, dir_name
                 self.path.append(self.file_information[row]["name"])
 
@@ -195,5 +217,11 @@ class PrimaryFilePage:
         if self.rename_arg:
             file_obj = self.file_information[row]
             data = str(self.table_view.item(row, column).text())
-            self.file_rename_function(data, file_obj["file_id"], file_obj["name"])
+            self.file_information[row]["name"] = data
+            self.file_rename_function(data=data, file_id=file_obj["file_id"], obj_type=file_obj["type"])
             self.rename_arg = False
+
+    def resizeEvent(self, e):
+        super().resizeEvent(e)
+        # self.verticalLayoutWidget.setFixedWidth(self.width())
+        self.loadProgressBar.setGeometry(0, 0, self.width(), 10)

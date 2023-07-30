@@ -13,35 +13,10 @@ from qframelesswindow import StandardTitleBar, FramelessWindow
 
 from interface.login_window import LoginWindow
 from interface.main_window import MainWindow
-from scripts.pages import HomePage, FilePage
+from scripts.method import info_message_display
 
 RESOURCE_IMAGES = "interface/resource/images/"
 DEFAULT_THEME_COLOUR = "#28afe9"
-
-
-def info_message_display(object_name, information_type: str = "info",
-                         information: str = "",
-                         title: str = "Null",
-                         whereis: str = "TOP",
-                         duration_time: int = 2000):
-    info_type = {"info": InfoBar.success,
-                 "warn": InfoBar.warning,
-                 "error": InfoBar.error}
-    position = {"TOP": InfoBarPosition.TOP,
-                "TOP_LEFT": InfoBarPosition.TOP_LEFT,
-                "TOP_RIGHT": InfoBarPosition.TOP_RIGHT,
-                "BUTTON": InfoBarPosition.BOTTOM,
-                "BUTTON_LEFT": InfoBarPosition.BOTTOM_LEFT,
-                "BUTTON_RIGHT": InfoBarPosition.BOTTOM.BOTTOM_RIGHT}
-
-    info_type[information_type.lower()](
-        title,
-        information,
-        isClosable=True,
-        position=position[whereis.upper()],
-        duration=duration_time,
-        parent=object_name
-    )
 
 
 class MessageDisplay(MessageDialog):
@@ -218,14 +193,16 @@ class MainUI(ShowWindows, MainWindow):
         super(MainUI, self).__init__()
         self.setup_ui(self)
         self.client_thread = kwargs["thread"]
-        self.home_page = HomePage("home")
-        self.file_page = FilePage("file", functions=kwargs["functions"])
+        self.home_page.setup_ui()
+        self.file_page.setup_ui(kwargs["functions"])
         self.get_files_function = kwargs["functions"]["get_files_function"]
         # 在导航栏添加组件
         self.addSubInterface(self.home_page, FluentIcon.HOME_FILL,
                              lambda: self.stackWidget.setCurrentWidget(self.home_page), "Home")
         self.navigationInterface.addSeparator()
-        self.addSubInterface(self.file_page, FluentIcon.FOLDER, lambda: self.show_file_page(), "Files")
+        self.addSubInterface(self.file_page, FluentIcon.FOLDER, self.show_file_page, "Files")
+        self.addSubInterface(self.task_page, FluentIcon.TAG, lambda: info_message_display(self, title="在写了在写了"),
+                             "task")
 
         # 因为titleBar不在MainWindows.py,所以在此处设置hBoxLayout的边距
         self.hBoxLayout.setContentsMargins(0, self.titleBar.height(), 0, 0)

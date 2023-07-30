@@ -4,16 +4,25 @@
 # @FileName: MainWindow.py
 # coding: utf-8
 
+from PyQt6.QtCore import QMetaObject
 from PyQt6.QtWidgets import *
-from qfluentwidgets import NavigationInterface, FluentIcon, NavigationItemPosition
+from qfluentwidgets import NavigationInterface, NavigationItemPosition
+
+from interface.file_page import FilePage
+from interface.home_page import HomePage
 
 
 class MainWindow:
     def __init__(self):
+        QMetaObject.connectSlotsByName(self)
         # 创建导航栏组件
         self.stackWidget = None
         self.hBoxLayout = None
         self.navigationInterface = NavigationInterface(self, showMenuButton=True)
+        self.home_page = HomePage("home")
+        self.file_page = FilePage("file")
+        self.task_page = QWidget()
+        self.task_page.setObjectName("task")
 
     """主窗口"""
     def setup_ui(self, form):
