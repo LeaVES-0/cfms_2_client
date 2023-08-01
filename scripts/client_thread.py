@@ -56,10 +56,11 @@ class Client:
         while True:
             more = self.client.recv(1024)
             primary_data += more
-            if len(more) < 1024:
-                recv = json.loads(self.cfms_AES_decrypt(primary_data))
-                pprint.pprint(recv)
-                return recv
+            if len(more) <= 1024:
+                break
+        recv = json.loads(self.cfms_AES_decrypt(primary_data))
+        pprint.pprint(recv)
+        return recv
 
     recv_data = property(cfms_recvall, )
 
