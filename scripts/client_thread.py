@@ -256,6 +256,7 @@ class ClientFtpThread(QThread):
                 ftp_file_io.write_file(sock=sock, size=file_size)
                 self.ftp_obj.voidresp()
                 self.ftp_obj.quit()
+                return {"state": True}
 
             elif is_dir:
                 ...
