@@ -73,11 +73,11 @@ class FtpFilesDownloadManager:
             else:
                 return {'state': False, 'error': "FNE"}
 
-    def write_file(self, sock, size: int = 0):
+    def write_file(self, sock, size: int = None):
         """写入本地文件"""
-        p_time = 0
         if not self.action == "download":
             raise TypeError
+        p_time = 0
         n_bytes = 0
         o_file = self.file.open(mode='wb')
         while True:
@@ -89,13 +89,11 @@ class FtpFilesDownloadManager:
             p_time += 1
             if p_time == 1200:
                 p_time = 0
-                try:
+                if size:
                     self.download_progress = n_bytes / size * 100
                     print(f"\rProgress:{self.download_progress:.2f}%", end='')
-                except ZeroDivisionError:
-                    ...
-                sys.stdout.flush()
-
+                    sys.stdout.flush()
+                    #
         print("\rProgress:100.00%", end='')
         print("\nDone.")
         sock.shutdown(2)
@@ -103,12 +101,28 @@ class FtpFilesDownloadManager:
         o_file.close()
         self.file.rename(f'{self.path}/{self.file_name}')
 
-    def read_file(self, sock):
+    def read_file(self, sock, size: int = None):
         """读取本地文件"""
         if not self.action == "upload":
             raise TypeError
         o_file = open(self.file, "rb")
-        chunk_data = o_file.read(262144)
-        sock.sendall(chunk_data)
+        p_time = 0
+        n_bytes = 0
+        while True:
+            chunk_data = o_file.read(1024)
+            if not chunk_data:
+                break
+            sock.sendall(chunk_data)
+            n_bytes += len(chunk_data)
+            p_time += 1
+            if p_time == 1200:
+                p_time = 0
+                if size:
+                    self.upload_progress = n_bytes / size * 100
+                    print(f"\rProgress:{self.upload_progress:.2f}%", end='')
+                    sys.stdout.flush()
+                    #
+        print("\rProgress:100.00%", end='')
+        print("\nDone.")
         sock.shutdown(2)
         sock.close()

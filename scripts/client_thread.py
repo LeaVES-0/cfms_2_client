@@ -50,24 +50,33 @@ class Client:
         decrypted_data = unpad(aes_cipher.decrypt(data[16:]), AES.block_size)
         return decrypted_data.decode()
 
-    def cfms_recvall(self) -> dict:
+    def cfms_recvall(self, crypt: bool = True):
         self.client.settimeout(40)
-        primary_data = b""
+        primary_data = self.client.recv(1024)
+        if primary_data[0] in (0, -1):  # 返回0,-1代表出错
+            raise ConnectionError
+        self.client.setblocking(False)
         while True:
-            more = self.client.recv(1024)
-            primary_data += more
-            if len(more) <= 1024:
+            try:
+                more = self.client.recv(1024)
+                primary_data += more
+            except BlockingIOError:
                 break
-        recv = json.loads(self.cfms_AES_decrypt(primary_data))
+        self.client.setblocking(True)
+        if crypt:
+            recv = json.loads(self.cfms_AES_decrypt(primary_data))
+        else:
+            recv = json.loads(primary_data)
         pprint.pprint(recv)
         return recv
 
     recv_data = property(cfms_recvall, )
 
-    def __cfms_send(self, request):
+    def __cfms_send(self, request, crypt: bool = True):
         pprint.pprint(request)
         print()
-        self.client.sendall(self.cfms_AES_encrypt(json.dumps(request)))
+        if crypt:
+            self.client.sendall(self.cfms_AES_encrypt(json.dumps(request)))
         return True
 
     def connect_cfms_server(self, host: str, port=DEFAULT_PORT) -> dict:
@@ -253,8 +262,8 @@ class ClientFtpThread(QThread):
         except ftplib.all_errors as e:
             return {"state": False, "error": e}
 
-    def upload_file(self, ftp_file_io: FtpFilesDownloadManager, task_id: str, task_token: str,
-                    ftp_file_names: dict, is_dir: bool = False):
+    def upload_file(self, ftp_file_io: FtpFilesDownloadManager, task_id: str, task_token: str, ftp_file_names: dict,
+                    file_size, is_dir: bool = False):
         try:
             if not is_dir:
                 ftp_file_name = list(ftp_file_names.values())[0]
@@ -262,7 +271,7 @@ class ClientFtpThread(QThread):
                 self.ftp_obj.login(user=task_id, passwd=task_token)
                 self.ftp_obj.prot_p()
                 sock = self.ftp_obj.transfercmd(cmd=f"STOR {ftp_file_name}", rest=None)
-                ftp_file_io.read_file(sock)
+                ftp_file_io.read_file(sock, file_size)
                 self.ftp_obj.voidresp()
                 self.ftp_obj.quit()
                 return {"state": True}

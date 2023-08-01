@@ -416,8 +416,9 @@ class MainClient:
                     task_id = recv["recv"]["data"]["task_id"]
                     task_token = recv["recv"]["data"]["task_token"]
                     ftp_file_names = recv["recv"]["data"]["t_filename"]  # 要上传的ftp文件名(字典)
+                    file_size = int(os.path.getsize(file_path))
                     ftp_task.load_ftp_obj(action="upload_file", args=(ftp_file_io, task_id, task_token,
-                                                                      ftp_file_names, False))
+                                                                      ftp_file_names, file_size, False))
                     ftp_task.ftp_signal.connect(__ftp_respond)
                     ftp_task.start()
                 if recv["recv"]['code'] == -1:
