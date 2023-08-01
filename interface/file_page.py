@@ -18,10 +18,12 @@ class FilePage(QWidget):
     def __init__(self, object_name):
         super().__init__(None)
         self.setObjectName(object_name)
-        self.path = [None, ]
-        self.current_path = None
-        self.last_dir_path = None
+        self.file_information = []
+        self.path = [('', '<ROOT>'), ]
+        self.current_path = ('', '<ROOT>')
+        self.last_dir_path = ('', '<ROOT>')
         self.rename_arg = False
+        self.create_new_arg = False
         self.loadProgressBar = IndeterminateProgressBar(self, start=False)
 
     def setup_ui(self, functions=None):
@@ -29,25 +31,24 @@ class FilePage(QWidget):
         self.file_rename_function = functions["rename_file_function"]
         self.download_file_function = functions["download_file_function"]
         self.delete_file_function = functions["delete_file_function"]
-        self.upload_new_file_function = functions["upload_new_file_function"]
-        self.verticalLayoutWidget = QWidget(self)
-        self.verticalLayoutWidget.setObjectName("verticalLayoutWidget")
+        self.upload_new_file_function = functions["upload_file_function"]
+        self.create_new_dir_function = functions["create_new_dir_function"]
         size_policy = QSizePolicy()
         size_policy.Policy(QSizePolicy.Policy.Preferred)
         size_policy.setHorizontalStretch(0)
         size_policy.setVerticalStretch(0)
-        self.verticalLayoutWidget.setSizePolicy(size_policy)
+        self.setSizePolicy(size_policy)
 
-        self.verticalLayout = QVBoxLayout(self)  # 全局布局
-        self.verticalLayoutWidget.setContentsMargins(0, 0, 0, 0)
+        self.verticalLayout = QVBoxLayout()  # 全局布局
+        self.setLayout(self.verticalLayout)
+        # self.setContentsMargins(0, 0, 0, 0)
         self.verticalLayout.setObjectName("verticalLayout")
-        # self.verticalLayout.addWidget(self.verticalLayoutWidget)
 
         self.verticalLayout_0_widget = QWidget(self)  # 这个控件和布局用来装标题和一些其他东西
-        self.verticalLayout_0 = QGridLayout(self)
+        self.verticalLayout_0 = QGridLayout(None)
         self.verticalLayout_0_widget.setLayout(self.verticalLayout_0)
+        # self.verticalLayout_0.setHorizontalSpacing(10)
         self.verticalLayout_0.setObjectName("verticalLayout_0")
-        # self.verticalLayout_0.addWidget(self.verticalLayout_0_widget)
 
         self.titleLabel = QLabel()  # 页面标题
         self.titleLabel.setText("Files")
@@ -57,11 +58,17 @@ class FilePage(QWidget):
             }"""
         )
         self.titleLabel.setContentsMargins(30, 20, 0, 0)
-        self.verticalLayout_0.addWidget(self.titleLabel)
+        self.verticalLayout_0.addWidget(self.titleLabel, 1, 0, 1, 4)
 
-        self.create_new_button = PrimaryDropDownPushButton(text='新建', icon=FluentIcon.ADD)
+        self.create_new_button = PrimaryDropDownPushButton(text='New', icon=FluentIcon.ADD)
+        create_new_menu = RoundMenu(self)
+        create_file_action = Action(FluentIcon.DOCUMENT, text='Create file')
+        create_folder_action = Action(FluentIcon.FOLDER_ADD, text='Create folder')
+        create_folder_action.triggered.connect(self.create_new_dir_function)
+        create_new_menu.addActions([create_file_action, create_folder_action])
+        self.create_new_button.setMenu(create_new_menu)
 
-        self.upload_button = PrimaryDropDownPushButton(text='上传', icon=FluentIcon.UP)
+        self.upload_button = PrimaryDropDownPushButton(text='Upload', icon=FluentIcon.UP)
         upload_menu = RoundMenu(self)
         upload_file_action = Action(FluentIcon.DOCUMENT, text='Upload file')
         upload_file_action.triggered.connect(self.choose_file)
@@ -69,15 +76,21 @@ class FilePage(QWidget):
         upload_menu.addActions([upload_file_action, upload_folder_action])
         self.upload_button.setMenu(upload_menu)
 
-        space_0 = QSpacerItem(200, 5)
         self.back_dir_button = ToolButton(FluentIcon.CARE_LEFT_SOLID, self)  # 上一级,下一级
         self.next_dir_button = ToolButton(FluentIcon.CARE_RIGHT_SOLID, self)
-        self.verticalLayout_0.addWidget(self.create_new_button, 2, 0, 1, 1)
-        self.verticalLayout_0.addWidget(self.upload_button, 2, 1, 1, 1)
-        self.verticalLayout_0.addItem(space_0, 2, 2, 1, 4)
-        self.verticalLayout_0.addWidget(self.back_dir_button, 2, 6, 1, 1)
-        self.verticalLayout_0.addWidget(self.next_dir_button, 2, 7, 1, 1)
+        layout_0 = QHBoxLayout()
+        layout_0_widget = QWidget(self)
+        layout_0.addWidget(self.back_dir_button, 1)
         self.back_dir_button.clicked.connect(lambda: self.change_dir_level(True))
+        layout_0.addWidget(self.next_dir_button, 1)
+        layout_0_widget.setLayout(layout_0)
+        self.verticalLayout_0.addWidget(layout_0_widget, 2, 0, Qt.AlignmentFlag.AlignLeft)
+        layout_1 = QHBoxLayout()
+        layout_1_widget = QWidget(self)
+        layout_1.addWidget(self.create_new_button, 1)
+        layout_1.addWidget(self.upload_button, 1)
+        layout_1_widget.setLayout(layout_1)
+        self.verticalLayout_0.addWidget(layout_1_widget, 2, 5, Qt.AlignmentFlag.AlignRight)
 
         self.verticalLayout_2_widget = QWidget(self)  # 这个控件和布局用来装文件树和文件目录
         self.verticalLayout_2 = QHBoxLayout()
@@ -104,12 +117,14 @@ class FilePage(QWidget):
         # 允许打开上下文菜单
         self.table_view.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         # 绑定事件
-        self.table_view.verticalHeader().hide()  # 表头
-        self.table_view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.table_view.verticalHeader().hide()  # 表头 | QHeaderView.ResizeMode.Stretch
         self.table_view.verticalHeader().setDefaultSectionSize(60)
         self.table_view.customContextMenuRequested.connect(self.file_list_button)
         self.verticalLayout_2.addWidget(self.table_view, 5)
         self.table_view.setContentsMargins(10, 100, 0, 0)
+        self.table_view.setColumnCount(5)
+        self.table_view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.table_view.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
 
         self.verticalLayout.addWidget(self.verticalLayout_0_widget)
         self.verticalLayout.addWidget(self.verticalLayout_2_widget)
@@ -122,33 +137,33 @@ class FilePage(QWidget):
             info_message_display(self, information_type="info", whereis="TOP_LEFT", title="已取消", )
 
     def file_list_button(self, pos):
-        """文件按键"""
+        """文件右键"""
         row = 0
         for i in self.table_view.selectionModel().selection().indexes():
             row = i.row()
-        file_id = self.file_information[row]["file_id"]
-        file_type = self.file_information[row]["type"]
-        screen_pos = self.table_view.mapToGlobal(pos)  # 转换坐标系
-        list_item_menu = RoundMenu(self)
-        copy_action = Action(FluentIcon.COPY, text='Copy')
-        cut_action = Action(FluentIcon.CUT, text='Cut')
-        delete_action = Action(FluentIcon.REMOVE_FROM, text="Delete")
-        list_item_menu.addActions([copy_action, cut_action, delete_action])
-        list_item_menu.addSeparator()
-        download_file_action = Action(FluentIcon.DOWNLOAD, text="Download")
-        download_folder_action = Action(FluentIcon.DOWNLOAD, text="Download")
-        if file_type == "file":
-            list_item_menu.addAction(download_file_action)
-        elif file_type == "dir":
-            list_item_menu.addAction(download_folder_action)
-        download_file_action.triggered.connect(lambda: self.download_file_function(file_index=row))
-        delete_action.triggered.connect(lambda: self.delete_file_function(file_id, file_type))
-        list_item_menu.exec(screen_pos, ani=True)
+        if self.file_information:
+            if self.file_information[row]:
+                file_type = self.file_information[row]["type"]
+                screen_pos = self.table_view.mapToGlobal(pos)  # 转换坐标系
+                self.list_item_menu = RoundMenu(self)
+                copy_action = Action(FluentIcon.COPY, text='Copy')
+                cut_action = Action(FluentIcon.CUT, text='Cut')
+                delete_action = Action(FluentIcon.REMOVE_FROM, text="Delete")
+                self.list_item_menu.addActions([copy_action, cut_action, delete_action])
+                self.list_item_menu.addSeparator()
+                download_file_action = Action(FluentIcon.DOWNLOAD, text="Download")
+                download_folder_action = Action(FluentIcon.DOWNLOAD, text="Download")
+                if file_type == "file":
+                    self.list_item_menu.addAction(download_file_action)
+                elif file_type == "dir":
+                    self.list_item_menu.addAction(download_folder_action)
+                download_file_action.triggered.connect(lambda: self.download_file_function(file_index=row))
+                delete_action.triggered.connect(lambda: self.delete_file_function(file_index=row))
+                self.list_item_menu.exec(screen_pos, ani=True)
 
     def set_file_tree_list(self, files):
         self.rename_arg = False
-        self.__set_files_list(files[0])
-        # self.__set_files_tree(files[1])
+        self.__set_files_list(files)
 
     def __set_files_tree(self, dirs):
         """文件树"""
@@ -170,16 +185,19 @@ class FilePage(QWidget):
 
     def __set_files_list(self, files: list):
         """设置文件列表"""
+        self.table_view.clear()
         self.table_view.setColumnCount(5)
+        self.table_view.setRowCount(len(files))
         self.table_view.verticalHeader().setDefaultSectionSize(60)
         self.file_information = files
-        self.table_view.clear()
-        self.table_view.setRowCount(len(self.file_information))
         # 批量设置表格项
         if not files:
             self.table_view.setColumnCount(1)
+            self.table_view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
             self.table_view.setHorizontalHeaderLabels(["No Files"])  # 行标题
         elif files:
+            self.table_view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+            self.table_view.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
             self.table_view.setHorizontalHeaderLabels(['FileName', 'Type', 'Size', 'Create Date', 'Permission'])  # 行标题
             for row, file_info in enumerate(self.file_information):
                 file_type = file_info["type"]
@@ -203,23 +221,28 @@ class FilePage(QWidget):
 
     def into_dir_action(self, row, column):
         self.rename_arg = True
-        dir_id = self.file_information[row]["file_id"]
-        dir_name = self.file_information[row]["name"]
-        print("clicked:", dir_id)
-        if not column == 0:
+        if not column == 0 and self.file_information[row]:
             if self.file_information[row]["type"] == "dir":
+                dir_id = self.file_information[row].get("file_id", "")
+                dir_name = self.file_information[row].get("name", "")
                 self.get_files_function(dir_id)
                 self.last_dir_path = self.current_path
-                self.current_path = dir_id, dir_name
+                self.current_path = (dir_id, dir_name)
                 self.path.append(self.file_information[row]["name"])
 
     def rename_action(self, row, column):
-        if self.rename_arg:
-            file_obj = self.file_information[row]
+        if self.rename_arg and not self.create_new_arg:
             data = str(self.table_view.item(row, column).text())
             self.file_information[row]["name"] = data
-            self.file_rename_function(data=data, file_id=file_obj["file_id"], obj_type=file_obj["type"])
-            self.rename_arg = False
+            self.file_rename_function(data=data, file_index=row)
+        self.rename_arg = False
+
+    def create_new_file_action(self, file_type: str = "folder"):
+        self.create_new_arg = True
+        self.file_information.insert(0, {})
+        self.table_view.insertRow(0)
+        for column in range(5):
+            self.table_view.setItem(0, column, self.__create_list_item('', column, file_type))
 
     def resizeEvent(self, e):
         super().resizeEvent(e)

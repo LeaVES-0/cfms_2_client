@@ -8,12 +8,12 @@ from PyQt6.QtCore import *
 from PyQt6.QtWidgets import *
 from qfluentwidgets import *
 
-from interface.resource.i18n.CN import *
 from scripts.client_thread import DEFAULT_PORT
 
 
-class LoginWindow:
-    def __init__(self):
+class LoginWindow(QObject):
+    def __init__(self, *args, **kwargs):
+        super().__init__()
         self.label = None
         self.widget = None
         self.horizontalLayout = None
@@ -52,7 +52,7 @@ class LoginWindow:
     def __init_grid_layout_server(self):
         # 设置服务器连接部分
         # 创建QGridLayout容器
-        self.GridLayoutFServer = QGridLayout()
+        self.GridLayoutFServer = QGridLayout(None)
         self.GridLayoutFServer.setHorizontalSpacing(4)
         self.GridLayoutFServer.setVerticalSpacing(9)
         self.GridLayoutFServer.setObjectName("GridLayoutFServer")
@@ -201,16 +201,16 @@ class LoginWindow:
         """登入部分
         统一设置组件的内容"""
         self.serverAdLE.setPlaceholderText("example.com")
-        self.label_3.setText(f"{ENTER_ADDRESS}")
+        self.label_3.setText(self.tr("Address"))
         self.serverPortLE.setText(f"{DEFAULT_PORT}")
-        self.label_4.setText(f"{ENTER_PORT}")
-        self.label_5.setText(f"{ENTER_USERNAME}")
+        self.label_4.setText(self.tr("Port"))
+        self.label_5.setText(self.tr("User"))
         self.userNameLE.setPlaceholderText("User")
-        self.label_6.setText(f"{ENTER_PASSWORD}")
+        self.label_6.setText(self.tr("Password"))
         self.userPasswordLE.setPlaceholderText("••••••••••••")
-        self.checkBox_remember_uer.setText(f"{REMEMBER_PASSWORD}")
-        self.login_Button.setText(f"{LOGIN_TEXT}")
-        self.login_Button.setToolTip(f"{LOGIN_BUTTON_TIP}")
-        self.back_Button.setText("断开连接")
-        self.link_server_button.setText("连接到服务器")
-        self.link_cancel_button.setText('取消')
+        self.checkBox_remember_uer.setText(self.tr("Remember Password"))
+        self.login_Button.setText(self.tr("Login"))
+        self.login_Button.setToolTip(self.tr("Login to the server."))
+        self.back_Button.setText(self.tr("Disconnect"))
+        self.link_server_button.setText(self.tr("Link"))
+        self.link_cancel_button.setText(self.tr("Cancel"))

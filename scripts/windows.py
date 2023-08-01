@@ -55,7 +55,7 @@ class LeaVESTitleBar(StandardTitleBar):
 
 
 class ShowWindows(FramelessWindow):
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
         """所有窗口采用统一的样式,
         统一设置,避免重复"""
         super().__init__()
@@ -66,8 +66,11 @@ class ShowWindows(FramelessWindow):
         self.titleBarObj = LeaVESTitleBar(parent=self)
         self.setTitleBar(self.titleBarObj)
         self.titleBarObj.raise_()
-        self.setWindowTitle('cfms__2.0')
+        self.setWindowTitle('cfms  2.0')
         self.setWindowIcon(QIcon(f"{RESOURCE_IMAGES}logo.png"))
+        self.splashScreen = SplashScreen(self.windowIcon(), kwargs["parent"])
+        self.splashScreen.setIconSize(QSize(106, 106))
+        self.splashScreen.raise_()
         # 大小
         self.resize(1000, 650)
         self.windowEffect.setMicaEffect(self.winId())
@@ -100,8 +103,8 @@ class ShowWindows(FramelessWindow):
 
 
 class LoginUI(ShowWindows, LoginWindow):
-    def __init__(self, **kwargs):
-        super().__init__()
+    def __init__(self, *args, **kwargs):
+        super().__init__(parent=self)
         self.setup_ui(self)
         self.login_finished = False
         self.client_thread = kwargs["thread"]
@@ -110,6 +113,7 @@ class LoginUI(ShowWindows, LoginWindow):
         self.titleBar.hBoxLayout.removeWidget(self.titleBar.maxBtn)
         # self.setFixedSize(self.width(), self.height())
         self.setLoginState(0)
+        self.splashScreen.finish()
 
     def set_interface_theme(self, interface_theme: str = "LIGHT"):
         if interface_theme == "DARK":
@@ -189,8 +193,8 @@ class LoginUI(ShowWindows, LoginWindow):
 
 class MainUI(ShowWindows, MainWindow):
 
-    def __init__(self, **kwargs):
-        super(MainUI, self).__init__()
+    def __init__(self, *args, **kwargs):
+        super(MainUI, self).__init__(parent=self)
         self.setup_ui(self)
         self.client_thread = kwargs["thread"]
         self.home_page.setup_ui()
@@ -206,6 +210,7 @@ class MainUI(ShowWindows, MainWindow):
 
         # 因为titleBar不在MainWindows.py,所以在此处设置hBoxLayout的边距
         self.hBoxLayout.setContentsMargins(0, self.titleBar.height(), 0, 0)
+        self.splashScreen.finish()
 
     def show_file_page(self):
         self.stackWidget.setCurrentWidget(self.file_page)

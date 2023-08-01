@@ -4,7 +4,7 @@
 # @FileName: MainWindow.py
 # coding: utf-8
 
-from PyQt6.QtCore import QMetaObject
+from PyQt6.QtCore import QMetaObject, QObject
 from PyQt6.QtWidgets import *
 from qfluentwidgets import NavigationInterface, NavigationItemPosition
 
@@ -12,8 +12,10 @@ from interface.file_page import FilePage
 from interface.home_page import HomePage
 
 
-class MainWindow:
-    def __init__(self):
+class MainWindow(QObject):
+    def __init__(self, *args, **kwargs):
+        """主窗口"""
+        super().__init__()
         QMetaObject.connectSlotsByName(self)
         # 创建导航栏组件
         self.stackWidget = None
@@ -24,7 +26,6 @@ class MainWindow:
         self.task_page = QWidget()
         self.task_page.setObjectName("task")
 
-    """主窗口"""
     def setup_ui(self, form):
         self.hBoxLayout = QHBoxLayout(form)
         self.stackWidget = QStackedWidget(form)

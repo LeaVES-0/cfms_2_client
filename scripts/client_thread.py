@@ -52,14 +52,13 @@ class Client:
 
     def cfms_recvall(self) -> dict:
         self.client.settimeout(40)
+        primary_data = b""
         while True:
-            primary_data, more = b"", b""
             more = self.client.recv(1024)
             primary_data += more
             if len(more) < 1024:
                 recv = json.loads(self.cfms_AES_decrypt(primary_data))
                 pprint.pprint(recv)
-                print()
                 return recv
 
     recv_data = property(cfms_recvall, )
@@ -233,42 +232,41 @@ class ClientFtpThread(QThread):
         super().__init__(None)
         self.ftp_address = address
         self.ftp_obj = ftplib.FTP_TLS()
-        self.ftp_obj.debug(2)
-        self.ftp_file_io = FtpFilesDownloadManager()
+        self.ftp_obj.debug(0)
 
-    def download_file(self, task_id: str, task_token: str, ftp_file_names: dict, file_info: list, is_dir: bool = False):
-        # file_info 每一项的1索引为文件大小, 0索引为文件名称
-        if not is_dir:
-            ftp_file_name = list(ftp_file_names.values())[0]
-            result = self.ftp_file_io.load_file(action="download", file=file_info[0][0])
-            if result["state"]:
+    def download_file(self, ftp_file_io: FtpFilesDownloadManager, task_id: str, task_token: str, ftp_file_names: dict,
+                      file_size, is_dir: bool = False):
+        try:
+            if not is_dir:
+                ftp_file_name = list(ftp_file_names.values())[0]
                 self.ftp_obj.connect(*self.ftp_address)
                 self.ftp_obj.login(user=task_id, passwd=task_token)
                 self.ftp_obj.prot_p()
                 sock, size = self.ftp_obj.ntransfercmd(cmd=f"RETR {ftp_file_name}", rest=None)
-                self.ftp_file_io.write_file(sock=sock, size=file_info[0][1])
+                ftp_file_io.write_file(sock=sock, size=file_size)
+                self.ftp_obj.voidresp()
                 self.ftp_obj.quit()
-                return {"state": True}
-            else:
-                return {"state": False, "error": result["error"]}
-        elif is_dir:
-            ...
 
-    def upload_new_file(self, task_id: str, task_token: str, ftp_file_names: dict, file_path: str,
-                        is_dir: bool = False):
-        if not is_dir:
-            ftp_file_name = list(ftp_file_names.values())[0]
-            result = self.ftp_file_io.load_file(action="upload", file=file_path)
-            if result["state"]:
+            elif is_dir:
+                ...
+        except ftplib.all_errors as e:
+            return {"state": False, "error": e}
+
+    def upload_file(self, ftp_file_io: FtpFilesDownloadManager, task_id: str, task_token: str,
+                    ftp_file_names: dict, is_dir: bool = False):
+        try:
+            if not is_dir:
+                ftp_file_name = list(ftp_file_names.values())[0]
                 self.ftp_obj.connect(*self.ftp_address)
                 self.ftp_obj.login(user=task_id, passwd=task_token)
                 self.ftp_obj.prot_p()
                 sock = self.ftp_obj.transfercmd(cmd=f"STOR {ftp_file_name}", rest=None)
-                self.ftp_file_io.read_file(sock)
+                ftp_file_io.read_file(sock)
+                self.ftp_obj.voidresp()
                 self.ftp_obj.quit()
                 return {"state": True}
-            else:
-                return {"state": False, "error": result["error"]}
+        except ftplib.all_errors as e:
+            return {"state": False, "error": e}
 
     def load_ftp_obj(self, action: str, args):
         self.ftp_obj_action = action
@@ -279,6 +277,6 @@ class ClientFtpThread(QThread):
         if self.ftp_obj_action == "download_file":
             recv = self.download_file(*self.ftp_obj_args)
 
-        elif self.ftp_obj_action == "upload_new_file":
-            recv = self.upload_new_file(*self.ftp_obj_args)
+        elif self.ftp_obj_action == "upload_file":
+            recv = self.upload_file(*self.ftp_obj_args)
         self.ftp_signal.emit(recv)

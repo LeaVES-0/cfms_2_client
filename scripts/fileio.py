@@ -7,6 +7,7 @@
 
 import json
 import pathlib
+import sys
 
 DEFAULT_PEM_DIR = "./data/saved_certs"
 DEFAULT_DATA_DIR = "./data"
@@ -72,8 +73,9 @@ class FtpFilesDownloadManager:
             else:
                 return {'state': False, 'error': "FNE"}
 
-    def write_file(self, sock, size: int):
+    def write_file(self, sock, size: int = 0):
         """写入本地文件"""
+        p_time = 0
         if not self.action == "download":
             raise TypeError
         n_bytes = 0
@@ -84,14 +86,18 @@ class FtpFilesDownloadManager:
                 break
             o_file.write(data)
             n_bytes += len(data)
-            print("Received", n_bytes)
-            self.download_progress = 100 * n_bytes / float(size)
-            if size:
-                print(f"of {size} total bytes ({self.download_progress:1f}%)")
-            else:
-                print("bytes")
-            # sys.stdout.flush()
-        print()
+            p_time += 1
+            if p_time == 1200:
+                p_time = 0
+                try:
+                    self.download_progress = n_bytes / size * 100
+                    print(f"\rProgress:{self.download_progress:.2f}%", end='')
+                except ZeroDivisionError:
+                    ...
+                sys.stdout.flush()
+
+        print("\rProgress:100.00%", end='')
+        print("\nDone.")
         sock.shutdown(2)
         sock.close()
         o_file.close()
@@ -101,8 +107,8 @@ class FtpFilesDownloadManager:
         """读取本地文件"""
         if not self.action == "upload":
             raise TypeError
-        data = self.file.read_bytes()
-        print("file len:", len(data))
-        sock.sendall(data)
+        o_file = open(self.file, "rb")
+        chunk_data = o_file.read(262144)
+        sock.sendall(chunk_data)
         sock.shutdown(2)
         sock.close()
