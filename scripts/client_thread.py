@@ -10,6 +10,8 @@ import json
 import pprint
 import socket
 import ssl
+import sys
+import threading
 import time
 
 from Crypto.Cipher import PKCS1_OAEP, AES
@@ -18,7 +20,7 @@ from Crypto.Random import get_random_bytes
 from Crypto.Util.Padding import pad, unpad
 from PyQt6.QtCore import *
 
-from scripts.fileio import ClientPemFile, FtpFilesDownloadManager
+from scripts.fileio import ClientPemFile, FtpFilesManager
 
 DEFAULT_PORT = 5103
 
@@ -53,7 +55,7 @@ class Client:
     def cfms_recvall(self, crypt: bool = True):
         self.client.settimeout(40)
         primary_data = self.client.recv(1024)
-        if primary_data[0] in (0, -1):  # 返回0,-1代表出错
+        if [primary_data][0] in (0, -1):  # 返回0,-1代表出错
             raise ConnectionError
         self.client.setblocking(False)
         while True:
@@ -129,12 +131,13 @@ class Client:
         account = {"username": user, "token": token}
         self.cfms_dict_to_send.setdefault("auth", {}).update(account)
 
-    def cfms_user_login(self, username: str, password: str):
+    def cfms_user_login(self, username: str, password: str, hashed: bool = False):
         """用户登陆"""
         try:
-            sha256_obj = hashlib.sha256()
-            sha256_obj.update(password.encode())
-            password = sha256_obj.hexdigest()
+            if not hashed:
+                sha256_obj = hashlib.sha256()
+                sha256_obj.update(password.encode())
+                password = sha256_obj.hexdigest()
             to_send = self.cfms_dict_to_send.copy()
             to_send.update({"request": "login", "data": {"username": f'{username}', "password": f'{password}'}})
             self.__cfms_send(to_send)
@@ -219,7 +222,8 @@ class ClientSubThread(QThread, Client):
 
             elif self.sub_thread_action == 1:
                 data_1 = self.cfms_user_login(username=self.sub_thread_kwargs["name"],
-                                              password=self.sub_thread_kwargs["password"])
+                                              password=self.sub_thread_kwargs["password"],
+                                              hashed=self.sub_thread_kwargs["hashed"])
                 self.signal.emit(data_1)
 
             elif self.sub_thread_action == 2:
@@ -235,59 +239,73 @@ class ClientSubThread(QThread, Client):
         self.loaded = False
 
 
-class ClientFtpThread(QThread):
-    ftp_signal = pyqtSignal(object, name="FTP_SubThread")
+class ClientFtpTask(QThread):
+    ftp_signal = pyqtSignal(object, name="FTP_SubThread_signal")
+    ftp_progress_signal = pyqtSignal(object, name="ftp_progress_signal")
 
-    def __init__(self, address: tuple):
+    UPLOAD_FILE = "UPLOAD_FILE"
+    DOWNLOAD_FILE = "DOWNLOAD_FILE"
+
+    def __init__(self, address: tuple, mode):
         super().__init__(None)
+        self.loaded = False
+        self._thread_run = True
         self.ftp_address = address
+        self.task_mode = mode
         self.ftp_obj = ftplib.FTP_TLS()
         self.ftp_obj.debug(0)
 
-    def download_file(self, ftp_file_io: FtpFilesDownloadManager, task_id: str, task_token: str, ftp_file_names: dict,
-                      file_size, is_dir: bool = False):
-        try:
-            if not is_dir:
-                ftp_file_name = list(ftp_file_names.values())[0]
-                self.ftp_obj.connect(*self.ftp_address)
-                self.ftp_obj.login(user=task_id, passwd=task_token)
-                self.ftp_obj.prot_p()
-                sock, size = self.ftp_obj.ntransfercmd(cmd=f"RETR {ftp_file_name}", rest=None)
-                ftp_file_io.write_file(sock=sock, size=file_size)
-                self.ftp_obj.voidresp()
-                self.ftp_obj.quit()
-                return {"state": True}
+    @property
+    def task_info(self):
+        return {"mode": self.task_mode}
 
-            elif is_dir:
-                ...
+    def load_task(self, _task_id, _task_token, task_fileio: FtpFilesManager, file_name=None):
+        self.loaded = True
+        self.task_id = _task_id
+        self.task_token = _task_token
+        self.task_fileio = task_fileio
+        if self.task_mode == "DOWNLOAD_FILE" and not file_name:
+            raise ValueError
+        self.ftp_fake_file_name = file_name
+        self.progress_thread = threading.Thread(target=lambda: self.get_transport_progress(self.task_fileio))
+
+    def task_transform(self):
+        try:
+            self.ftp_obj.connect(*self.ftp_address)
+            self.ftp_obj.login(user=self.task_id, passwd=self.task_token)
+            self.ftp_obj.prot_p()
+            self.progress_thread.start()
+            if self.task_mode == "DOWNLOAD_FILE":
+                sock = self.ftp_obj.transfercmd(cmd=f"RETR {self.ftp_fake_file_name}", rest=None)
+                self.task_fileio.write_file(sock)
+
+            elif self.task_mode == "UPLOAD_FILE":
+                sock = self.ftp_obj.transfercmd(cmd=f"STOR {self.ftp_fake_file_name}", rest=None)
+                self.task_fileio.read_file(sock)
+            self._thread_run = False
+            self.ftp_obj.voidresp()
+            self.ftp_obj.quit()
+            return {"state": True}
         except ftplib.all_errors as e:
             return {"state": False, "error": e}
+        finally:
+            self._thread_run = False
 
-    def upload_file(self, ftp_file_io: FtpFilesDownloadManager, task_id: str, task_token: str, ftp_file_names: dict,
-                    file_size, is_dir: bool = False):
-        try:
-            if not is_dir:
-                ftp_file_name = list(ftp_file_names.values())[0]
-                self.ftp_obj.connect(*self.ftp_address)
-                self.ftp_obj.login(user=task_id, passwd=task_token)
-                self.ftp_obj.prot_p()
-                sock = self.ftp_obj.transfercmd(cmd=f"STOR {ftp_file_name}", rest=None)
-                ftp_file_io.read_file(sock, file_size)
-                self.ftp_obj.voidresp()
-                self.ftp_obj.quit()
-                return {"state": True}
-        except ftplib.all_errors as e:
-            return {"state": False, "error": e}
+    def get_transport_progress(self, file_io: FtpFilesManager):
+        while self._thread_run:
+            progress = round(100 * file_io.transport_bytes / file_io.file_size, 2)
+            # self.ftp_progress_signal.emit(progress)
+            print(f"\r {progress}%", end=' ')
+            if int(progress) == 100:
+                print(f"100.00%", end=' ')
+                sys.stdout.flush()
+                break
 
-    def load_ftp_obj(self, action: str, args):
-        self.ftp_obj_action = action
-        self.ftp_obj_args = args
+            sys.stdout.flush()
+            time.sleep(0.1)
 
     def run(self):
-        recv = None
-        if self.ftp_obj_action == "download_file":
-            recv = self.download_file(*self.ftp_obj_args)
-
-        elif self.ftp_obj_action == "upload_file":
-            recv = self.upload_file(*self.ftp_obj_args)
+        if not self.loaded:
+            raise ValueError
+        recv = self.task_transform()
         self.ftp_signal.emit(recv)

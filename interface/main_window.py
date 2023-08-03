@@ -10,6 +10,7 @@ from qfluentwidgets import NavigationInterface, NavigationItemPosition
 
 from interface.file_page import FilePage
 from interface.home_page import HomePage
+from interface.task_page import TaskPage
 
 
 class MainWindow(QObject):
@@ -23,8 +24,7 @@ class MainWindow(QObject):
         self.navigationInterface = NavigationInterface(self, showMenuButton=True)
         self.home_page = HomePage("home")
         self.file_page = FilePage("file")
-        self.task_page = QWidget()
-        self.task_page.setObjectName("task")
+        self.task_page = TaskPage("task")
 
     def setup_ui(self, form):
         self.hBoxLayout = QHBoxLayout(form)

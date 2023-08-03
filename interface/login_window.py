@@ -88,6 +88,8 @@ class LoginWindow(QObject):
         self.GridLayoutFServer.addWidget(self.link_cancel_button, 4, 0, 1, 5)
         self.link_cancel_button.setEnabled(False)
 
+        self.verticalLayout_2.addLayout(self.GridLayoutFServer)
+
     def __init_qvboxlayout_user(self):
         self.QVBoxLayout_2 = QVBoxLayout()
         self.QVBoxLayout_2.setObjectName("QVBoxLayout_2")
@@ -130,9 +132,36 @@ class LoginWindow(QObject):
         spacer_item5 = QSpacerItem(20, 5, QSizePolicy.Policy.Minimum,
                                    QSizePolicy.Policy.Fixed)
         self.QVBoxLayout_2.addItem(spacer_item5)
-        self.back_Button = PrimaryPushButton()
+        self.back_Button = PushButton()
         self.back_Button.setObjectName("back_Button")
         self.QVBoxLayout_2.addWidget(self.back_Button)
+
+        self.verticalLayout_2.addLayout(self.QVBoxLayout_2)
+
+    def __init_qvboxlayout_user_logined(self):
+        self.QVBoxLayout_3 = QVBoxLayout()
+        self.QVBoxLayout_3.setObjectName("QVBoxLayout_3")
+        self.show_user_name = PushButton()
+        self.show_user_name.setText("")
+        self.show_user_name.setObjectName("show_user_name")
+        self.QVBoxLayout_3.addWidget(self.show_user_name)
+        spacer_item0 = QSpacerItem(20, 20, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
+        self.QVBoxLayout_3.addItem(spacer_item0)
+        self.login_directly_button = PrimaryPushButton()
+        self.login_directly_button.setObjectName("init_directly_button")
+        self.QVBoxLayout_3.addWidget(self.login_directly_button)
+        spacer_item = QSpacerItem(20, 5, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
+        self.QVBoxLayout_3.addItem(spacer_item)
+        self.login_out_Button = PrimaryPushButton()
+        self.login_out_Button.setObjectName("login_out_Button")
+        self.QVBoxLayout_3.addWidget(self.login_out_Button)
+        spacer_item1 = QSpacerItem(20, 20, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
+        self.QVBoxLayout_3.addItem(spacer_item1)
+        self.back_Button_2 = PushButton()
+        self.back_Button_2.setObjectName("back_Button_2")
+        self.QVBoxLayout_3.addWidget(self.back_Button_2)
+
+        self.verticalLayout_2.addLayout(self.QVBoxLayout_3)
 
     def __init_vertical_qvboxlayout_2(self):
         # 创建一个容器(整个侧栏)
@@ -183,19 +212,19 @@ class LoginWindow(QObject):
         self.verticalLayout_2.addWidget(self.connectedServerLabel)
         self.connectedServerLabel.setVisible(False)
         self.connectedServerLabel.setText("")
+        # spacerItem
+        # spacer_item5 = QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
+        # self.verticalLayout_2.addItem(spacer_item5)
 
         spacer_item3 = QSpacerItem(20, 15, QSizePolicy.Policy.Minimum,
                                    QSizePolicy.Policy.Fixed)
         self.verticalLayout_2.addItem(spacer_item3)
 
         self.__init_grid_layout_server()
-        self.verticalLayout_2.addLayout(self.GridLayoutFServer)
 
         self.__init_qvboxlayout_user()
-        self.verticalLayout_2.addLayout(self.QVBoxLayout_2)
-        # spacerItem
-        spacer_item5 = QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
-        self.verticalLayout_2.addItem(spacer_item5)
+
+        self.__init_qvboxlayout_user_logined()
 
     def re_set_text(self):
         """登入部分
@@ -210,7 +239,10 @@ class LoginWindow(QObject):
         self.userPasswordLE.setPlaceholderText("••••••••••••")
         self.checkBox_remember_uer.setText(self.tr("Remember Password"))
         self.login_Button.setText(self.tr("Login"))
+        self.login_out_Button.setText(self.tr("Logout"))
+        self.login_directly_button.setText(self.tr("Login"))
         self.login_Button.setToolTip(self.tr("Login to the server."))
         self.back_Button.setText(self.tr("Disconnect"))
+        self.back_Button_2.setText(self.tr("Disconnect"))
         self.link_server_button.setText(self.tr("Link"))
         self.link_cancel_button.setText(self.tr("Cancel"))

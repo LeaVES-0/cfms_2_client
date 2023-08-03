@@ -7,7 +7,6 @@
 
 import json
 import pathlib
-import sys
 
 DEFAULT_PEM_DIR = "./data/saved_certs"
 DEFAULT_DATA_DIR = "./data"
@@ -48,81 +47,63 @@ class ClientDataFile:
         self.data.write_text(json.dumps(obj=data, indent=4))
 
 
-class FtpFilesDownloadManager:
+class FtpFilesManager:
+    WRITE = "write"
+    READ = "read"
+
     def __init__(self, down_path: str = DEFAULT_DOWNLOAD_PATH):
         pathlib.Path(down_path).mkdir(parents=True, exist_ok=True)
-        self.path = down_path
+        self.down_path = down_path
         self.action = None
+        self.transport_bytes = 0
 
-    def load_file(self, action: str, file: str):
+    def load_file(self, action: str, file: str, file_size=None):
         """载入
         file形参 可以是要上传文件的路径,或是要下载文件的名称."""
         self.action = action
-        if action == "download":
-            if not pathlib.Path(f'{self.path}/{file}').exists():
-                self.file_name = file
-                self.file = pathlib.Path(f'{DEFAULT_DOWNLOAD_PATH}/{file!s}.cfms_download')
+        self.file_size = file_size
+        if action == "write":
+            self.filename = file
+            if not pathlib.Path(f'{self.down_path}/{self.filename}').exists():
+                self.file = pathlib.Path(f'{DEFAULT_DOWNLOAD_PATH}/{self.filename!s}.cfms_download')
                 return {'state': True}
             else:
                 return {'state': False, 'error': "FEE"}
-        elif action == "upload":
-            file_obj = pathlib.Path(file)
-            if file_obj.exists():
-                self.file = file_obj
+
+        elif action == "read":
+            file_path = pathlib.Path(file)
+            if file_path.exists():
+                self.file = file_path
                 return {'state': True}
             else:
                 return {'state': False, 'error': "FNE"}
 
-    def write_file(self, sock, size: int = None):
+    def write_file(self, sock):
         """写入本地文件"""
-        if not self.action == "download":
+        if not self.action == "write":
             raise TypeError
-        p_time = 0
-        n_bytes = 0
         o_file = self.file.open(mode='wb')
         while True:
             data = sock.recv(1024)
             if not data:
                 break
             o_file.write(data)
-            n_bytes += len(data)
-            p_time += 1
-            if p_time == 1200:
-                p_time = 0
-                if size:
-                    self.download_progress = n_bytes / size * 100
-                    print(f"\rProgress:{self.download_progress:.2f}%", end='')
-                    sys.stdout.flush()
-                    #
-        print("\rProgress:100.00%", end='')
-        print("\nDone.")
+            self.transport_bytes += len(data)
         sock.shutdown(2)
         sock.close()
         o_file.close()
-        self.file.rename(f'{self.path}/{self.file_name}')
+        self.file.rename(f'{self.down_path}/{self.filename}')
 
-    def read_file(self, sock, size: int = None):
+    def read_file(self, sock):
         """读取本地文件"""
-        if not self.action == "upload":
+        if not self.action == "read":
             raise TypeError
         o_file = open(self.file, "rb")
-        p_time = 0
-        n_bytes = 0
         while True:
             chunk_data = o_file.read(1024)
             if not chunk_data:
                 break
             sock.sendall(chunk_data)
-            n_bytes += len(chunk_data)
-            p_time += 1
-            if p_time == 1200:
-                p_time = 0
-                if size:
-                    self.upload_progress = n_bytes / size * 100
-                    print(f"\rProgress:{self.upload_progress:.2f}%", end='')
-                    sys.stdout.flush()
-                    #
-        print("\rProgress:100.00%", end='')
-        print("\nDone.")
+            self.transport_bytes += len(chunk_data)
         sock.shutdown(2)
         sock.close()

@@ -21,7 +21,6 @@ class FilePage(QWidget):
         self.file_information = []
         self.path = [('', '<ROOT>'), ]
         self.current_path = ('', '<ROOT>')
-        self.last_dir_path = ('', '<ROOT>')
         self.rename_arg = False
         self.create_new_arg = False
         self.loadProgressBar = IndeterminateProgressBar(self, start=False)
@@ -43,6 +42,7 @@ class FilePage(QWidget):
         self.setLayout(self.verticalLayout)
         # self.setContentsMargins(0, 0, 0, 0)
         self.verticalLayout.setObjectName("verticalLayout")
+        self.verticalLayout.addWidget(self.loadProgressBar)
 
         self.verticalLayout_0_widget = QWidget(self)  # 这个控件和布局用来装标题和一些其他东西
         self.verticalLayout_0 = QGridLayout(None)
@@ -60,6 +60,17 @@ class FilePage(QWidget):
         self.titleLabel.setContentsMargins(30, 20, 0, 0)
         self.verticalLayout_0.addWidget(self.titleLabel, 1, 0, 1, 4)
 
+        self.back_dir_button = ToolButton(FluentIcon.CARE_LEFT_SOLID, self)  # 上一级,下一级
+        self.next_dir_button = ToolButton(FluentIcon.CARE_RIGHT_SOLID, self)
+        layout_0 = QHBoxLayout()  #
+        layout_0_widget = QWidget(self)
+        layout_0.addWidget(self.back_dir_button, 1)
+        self.back_dir_button.clicked.connect(lambda: self.change_dir_level(True))
+        layout_0.addWidget(self.next_dir_button, 1)
+        layout_0_widget.setLayout(layout_0)
+        self.verticalLayout_0.addWidget(layout_0_widget, 2, 0, Qt.AlignmentFlag.AlignRight)
+
+        # 创建新文件Button
         self.create_new_button = PrimaryDropDownPushButton(text='New', icon=FluentIcon.ADD)
         create_new_menu = RoundMenu(self)
         create_file_action = Action(FluentIcon.DOCUMENT, text='Create file')
@@ -67,7 +78,7 @@ class FilePage(QWidget):
         create_folder_action.triggered.connect(self.create_new_dir_function)
         create_new_menu.addActions([create_file_action, create_folder_action])
         self.create_new_button.setMenu(create_new_menu)
-
+        # 上传Button
         self.upload_button = PrimaryDropDownPushButton(text='Upload', icon=FluentIcon.UP)
         upload_menu = RoundMenu(self)
         upload_file_action = Action(FluentIcon.DOCUMENT, text='Upload file')
@@ -76,56 +87,39 @@ class FilePage(QWidget):
         upload_menu.addActions([upload_file_action, upload_folder_action])
         self.upload_button.setMenu(upload_menu)
 
-        self.back_dir_button = ToolButton(FluentIcon.CARE_LEFT_SOLID, self)  # 上一级,下一级
-        self.next_dir_button = ToolButton(FluentIcon.CARE_RIGHT_SOLID, self)
-        layout_0 = QHBoxLayout()
-        layout_0_widget = QWidget(self)
-        layout_0.addWidget(self.back_dir_button, 1)
-        self.back_dir_button.clicked.connect(lambda: self.change_dir_level(True))
-        layout_0.addWidget(self.next_dir_button, 1)
-        layout_0_widget.setLayout(layout_0)
-        self.verticalLayout_0.addWidget(layout_0_widget, 2, 0, Qt.AlignmentFlag.AlignLeft)
-        layout_1 = QHBoxLayout()
+        layout_1 = QHBoxLayout()  #
         layout_1_widget = QWidget(self)
         layout_1.addWidget(self.create_new_button, 1)
         layout_1.addWidget(self.upload_button, 1)
         layout_1_widget.setLayout(layout_1)
         self.verticalLayout_0.addWidget(layout_1_widget, 2, 5, Qt.AlignmentFlag.AlignRight)
 
-        self.verticalLayout_2_widget = QWidget(self)  # 这个控件和布局用来装文件树和文件目录
+        # 这个控件和布局用来装文件树和文件目录
+        self.verticalLayout_2_widget = QWidget(self)
         self.verticalLayout_2 = QHBoxLayout()
         self.verticalLayout_2_widget.setLayout(self.verticalLayout_2)
         self.verticalLayout_2.setObjectName("verticalLayout_2")
-        # self.verticalLayout_2.addWidget(self.verticalLayout_2_widget)
-
-        # self.file_tree = TreeWidget()  # 文件树 #TODO
-        # root_item = QTreeWidgetItem()
-        # self.file_tree.addTopLevelItem(root_item)
-        # root_item.setText(0, "/")
-        # self.file_tree.expandAll()
-        # self.file_tree.setHeaderHidden(True)
-        # self.verticalLayout_2.addWidget(self.file_tree, 2)
-
-        self.table_view = TableWidget()  # 创建表格
+        # 文件列表
+        self.table_view = TableWidget()
         self.table_view.setObjectName("table_file_view")
         self.table_view.setWordWrap(True)
-        self.table_view.setHorizontalHeaderLabels(['FileName', 'Type', 'Size', 'Create Date', 'Permission'])  # 行标题
+        self.table_view.setHorizontalHeaderLabels(['', 'FileName', 'Type', 'Size', 'Create Date', 'Permission'])  # 行标题
         self.table_view.cellDoubleClicked.connect(self.into_dir_action)
         self.table_view.cellChanged.connect(self.rename_action)
         self.table_view.clear()
-
         # 允许打开上下文菜单
         self.table_view.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        # 绑定事件
-        self.table_view.verticalHeader().hide()  # 表头 | QHeaderView.ResizeMode.Stretch
+        # 表头
+        self.table_view.verticalHeader().hide()
         self.table_view.verticalHeader().setDefaultSectionSize(60)
         self.table_view.customContextMenuRequested.connect(self.file_list_button)
-        self.verticalLayout_2.addWidget(self.table_view, 5)
         self.table_view.setContentsMargins(10, 100, 0, 0)
         self.table_view.setColumnCount(5)
         self.table_view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.table_view.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        self.verticalLayout_2.addWidget(self.table_view, 5)
 
+        # 在全局布局里嵌套布局
         self.verticalLayout.addWidget(self.verticalLayout_0_widget)
         self.verticalLayout.addWidget(self.verticalLayout_2_widget)
 
@@ -170,7 +164,7 @@ class FilePage(QWidget):
         ...
 
     @staticmethod
-    def __create_list_item(info, column: int = 0, obj_type: str = "file"):
+    def __create_list_item(info, column, obj_type: str = "file"):
         """设置单元格"""
         item = QTableWidgetItem(info)
         if column != 0:
@@ -185,52 +179,54 @@ class FilePage(QWidget):
 
     def __set_files_list(self, files: list):
         """设置文件列表"""
-        self.table_view.clear()
-        self.table_view.setColumnCount(5)
-        self.table_view.setRowCount(len(files))
+        self.loadProgressBar.stop()
         self.table_view.verticalHeader().setDefaultSectionSize(60)
+        if files == self.file_information:
+            return
         self.file_information = files
+        self.table_view.clear()
         # 批量设置表格项
         if not files:
             self.table_view.setColumnCount(1)
+            self.table_view.setRowCount(0)
             self.table_view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-            self.table_view.setHorizontalHeaderLabels(["No Files"])  # 行标题
+            self.table_view.setHorizontalHeaderLabels(["No File"])  # 行标题
         elif files:
+            self.table_view.setColumnCount(5)
+            self.table_view.setRowCount(len(files))
             self.table_view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
             self.table_view.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
-            self.table_view.setHorizontalHeaderLabels(['FileName', 'Type', 'Size', 'Create Date', 'Permission'])  # 行标题
+            self.table_view.setHorizontalHeaderLabels(['FileName', 'Type', 'Size', 'Create Date', 'Permission'])
             for row, file_info in enumerate(self.file_information):
-                file_type = file_info["type"]
                 for column in range(5):
                     file_info_list = [file_info["name"], file_info["type"], file_info["transformed_size"],
                                       file_info["create_time"], file_info["permission"]]
                     self.table_view.setItem(row, column,
-                                            self.__create_list_item(file_info_list[column], column, file_type))
+                                            self.__create_list_item(file_info_list[column], column, file_info["type"]))
 
     def change_dir_level(self, action: bool):
         if action:
             if len(self.path) > 1:
                 self.current_path = self.path[-2]
                 del self.path[-1]
-                if not self.current_path:
-                    self.get_files_function()
-                else:
-                    self.get_files_function(self.current_path[0])
+                self.get_files_function(self.current_path[0])
             else:
+                self.current_path = ('', '<ROOT>')
                 self.get_files_function()
 
     def into_dir_action(self, row, column):
+        """进入目录"""
         self.rename_arg = True
-        if not column == 0 and self.file_information[row]:
+        if not column == 0:
             if self.file_information[row]["type"] == "dir":
                 dir_id = self.file_information[row].get("file_id", "")
                 dir_name = self.file_information[row].get("name", "")
                 self.get_files_function(dir_id)
-                self.last_dir_path = self.current_path
                 self.current_path = (dir_id, dir_name)
-                self.path.append(self.file_information[row]["name"])
+                self.path.append(self.current_path)
 
     def rename_action(self, row, column):
+        """rename"""
         if self.rename_arg and not self.create_new_arg:
             data = str(self.table_view.item(row, column).text())
             self.file_information[row]["name"] = data
@@ -238,13 +234,10 @@ class FilePage(QWidget):
         self.rename_arg = False
 
     def create_new_file_action(self, file_type: str = "folder"):
+        """新建文件夹"""
         self.create_new_arg = True
         self.file_information.insert(0, {})
         self.table_view.insertRow(0)
         for column in range(5):
             self.table_view.setItem(0, column, self.__create_list_item('', column, file_type))
 
-    def resizeEvent(self, e):
-        super().resizeEvent(e)
-        # self.verticalLayoutWidget.setFixedWidth(self.width())
-        self.loadProgressBar.setGeometry(0, 0, self.width(), 10)

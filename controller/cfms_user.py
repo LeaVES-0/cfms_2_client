@@ -50,6 +50,7 @@ class CfmsUserManager:
         changed = False
         for server in self.client_memory["servers"]:
             if server["server_address"] == self.server_address:
+                server["last_login"] = account[0]
                 if server.setdefault('users', []):
                     users = [i for i in server['users']]
                     for index, saved_account in enumerate(users):
@@ -71,12 +72,14 @@ class CfmsUserManager:
     def get_saved_users(self):
         # 连接成功后可用
         self.__refresh_data()
-        user_names = []
+        users = []
+        last_login = None
         for server in [s for s in self.client_memory["servers"]]:
             if server["server_address"] == self.server_address:
-                user_names = [name[0] for name in server["users"]]
+                last_login = server.get("last_login", None)
+                users = [user for user in server["users"]]
                 break
-        return user_names
+        return users, last_login
 
     saved_servers = property(get_saved_servers)
     saved_users = property(get_saved_users)

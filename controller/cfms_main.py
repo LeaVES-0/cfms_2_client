@@ -11,11 +11,11 @@ import time
 
 from PyQt6.QtCore import *
 from PyQt6.QtWidgets import QApplication
-from qfluentwidgets import FluentTranslator, Theme
+from qfluentwidgets import FluentTranslator
 
 from controller.cfms_user import CfmsUserManager
-from scripts.client_thread import ClientSubThread, ClientFtpThread
-from scripts.fileio import FtpFilesDownloadManager
+from scripts.client_thread import ClientSubThread, ClientFtpTask
+from scripts.fileio import FtpFilesManager
 from scripts.method import info_message_display
 from scripts.windows import LoginUI, MainUI, MessageDisplay
 
@@ -89,6 +89,7 @@ class MainClient:
         self.login_w.login_Button.clicked.connect(lambda: self.user_login_function(self.login_w.getUserAccount()))
         self.login_w.connectedServerLabel.clicked.connect(lambda: self.show_public_key_meg())
         self.login_w.link_cancel_button.clicked.connect(self.cancel_link)
+        self.login_w.back_Button_2.clicked.connect(lambda: self.close_connection_function())
 
     def __check_link_state(self, args: dict):
         """检测连接状态"""
@@ -96,23 +97,43 @@ class MainClient:
         state = args["clientState"]
         server_address = args["address"]
         self.login_w.loadProgressBar.stop()
+        self.login_w.link_server_button.setEnabled(True)
+        self.login_w.link_cancel_button.setEnabled(False)
         if state:
             self.ftp_host = server_address[0]
+            self.usermanager.remember_linked_server(address=list(server_address))  # 储存连接成功的服务器信息
             print(f"Server state: 0. \nLink successful.")
             info_message_display(self.login_w, information_type="info", whereis="TOP_LEFT", title="连接成功!")
             if args["isFirstTimeConnection"]:
                 info_message_display(self.login_w, information_type="info", whereis="BUTTON_LEFT", title="注意",
                                      information="首次连接到该服务器，公钥已保存。")
-            self.login_w.setLoginState(1)
             self.login_w.connectedServerLabel.setVisible(True)
             self.login_w.connectedServerLabel.setText(f"已连接到 {server_address[0]}:{server_address[1]}")
-            self.usermanager.remember_linked_server(address=list(server_address))  # 储存连接成功的服务器信息
-            self.login_w.userNameLE.addItems(self.usermanager.saved_users)
-            self.login_w.userNameLE.setCurrentIndex(0)
+            saved_users = self.usermanager.saved_users
+            last_login_password = None
+            for u in saved_users[0]:
+                if u[0] == saved_users[1]:
+                    last_login_password = u[1]
+                    break
+
+            def logout():
+                self.usermanager.remember_logined_user([saved_users[1], None])
+                self.login_w.checkBox_remember_uer.setChecked(False)
+                self.login_w.setLoginState(1)
+
+            if saved_users[1] and last_login_password:
+                self.login_w.show_user_name.setText(f"User: {saved_users[1]}")
+                self.login_w.login_directly_button.clicked.connect(
+                    lambda: self.user_login_function((saved_users[1], last_login_password), True))
+                self.login_w.login_out_Button.clicked.connect(lambda: logout())
+                self.login_w.checkBox_remember_uer.setChecked(True)
+                self.login_w.setLoginState(2)
+            else:
+                self.login_w.setLoginState(1)
+                self.login_w.userNameLE.addItems(saved_users[0][0])
+                self.login_w.userNameLE.setCurrentIndex(0)
 
         else:
-            self.login_w.link_server_button.setEnabled(True)
-            self.login_w.link_cancel_button.setEnabled(False)
             if not args["isSameKey"]:
                 info_message_display(self.login_w, duration_time=1500, information_type="warn", whereis="TOP_RIGHT",
                                      title=" 公钥异常")
@@ -128,6 +149,8 @@ class MainClient:
     def __check_login_state(self, signal: dict):
         """检测登陆状态"""
         self.login_w.loadProgressBar.stop()
+        self.login_w.login_Button.setEnabled(True)
+        self.login_w.back_Button.setEnabled(True)
         if signal["loginState"]:
             recv_from_server = signal["recv"]  # 服务器返回值
             if recv_from_server["code"] == 0:
@@ -135,18 +158,16 @@ class MainClient:
                 self.login_w.login_finished = True
                 self.ftp_port = recv_from_server["ftp_port"]  # ftp 端口
                 print("Login successful!")
-                info_message_display(self.main_w, information_type="info", whereis="TOP",
-                                     title="登录成功!", duration_time=1000)
-                login_information = signal['account']  # 存有用户账户的元组
-                # 同步主题
-                if self.login_w.theme == Theme.DARK:
-                    self.main_w.setThemeState()
-                    self.main_w.setThemeState()
-                user_token = recv_from_server["token"]  # 获取到token
                 # 设置窗口
                 self.login_w.close()
-                # self.main_w.close()  # 正常情况无需先关闭，此处是为了ui debug模式考量
+                # 同步主题
+                self.main_w.interface_theme = self.login_w.interface_theme
                 self.main_w.mainUI()
+                info_message_display(self.main_w, information_type="info", whereis="TOP_RIGHT",
+                                     title="登录成功!", duration_time=2000)
+
+                login_information = signal['account']  # 存有用户账户的元组
+                user_token = recv_from_server["token"]  # 获取到token
                 username = login_information[0]
                 hashed_password = login_information[1]
                 self.sub_thread.set_auth(user=username, token=user_token)
@@ -155,15 +176,16 @@ class MainClient:
                     self.usermanager.remember_logined_user([username, hashed_password])
                 else:
                     self.usermanager.remember_logined_user([username, None])
+                self.login_w.checkBox_remember_uer.setChecked(False)
 
             elif recv_from_server["code"] == 401:
                 # 登录失败, 密码错误
                 msg = recv_from_server.get("msg", '')
-                info_message_display(self.login_w, information_type="warn", whereis="TOP_LEFT", title="登陆失败。",
+                info_message_display(self.login_w, information_type="warn", whereis="TOP_RIGHT", title="登陆失败。",
                                      information=f"密码错误:{msg!s}")
         elif not signal["loginState"]:
             # 其他异常
-            info_message_display(self.login_w, information_type="error", whereis="TOP_LEFT", title="错误",
+            info_message_display(self.login_w, information_type="error", whereis="TOP_RIGHT", title="错误",
                                  information=f"{signal['error']!s}")
         self.sub_thread.signal.disconnect(self.__check_login_state)  # 不管登录成功与否,都断开信号槽连接
 
@@ -188,15 +210,17 @@ class MainClient:
             self.sub_thread.signal.connect(self.__check_link_state)
             self.sub_thread.start()
 
-    def user_login_function(self, account: tuple):
+    def user_login_function(self, account: tuple, hashed: bool = False):
         """登录"""
         if not account[0] or not account[1]:
-            info_message_display(self.login_w, information_type="warn", whereis="TOP_LEFT", title="警告",
+            info_message_display(self.login_w, information_type="warn", whereis="TOP_RIGHT", title="警告",
                                  information="用户名或密码不得为空")
         else:
             print('Logining......')
-            self.login_w.loadProgressBar.start()
-            self.sub_thread.load_sub_thread(action=1, name=account[0], password=account[1])
+            self.login_w.loadProgressBar.start()  # 禁用按键,开启进度条
+            self.login_w.login_Button.setEnabled(False)
+            self.login_w.back_Button.setEnabled(False)
+            self.sub_thread.load_sub_thread(action=1, name=account[0], password=account[1], hashed=hashed)
             self.sub_thread.signal.connect(self.__check_login_state)
             self.sub_thread.start()
 
@@ -223,7 +247,9 @@ class MainClient:
             """转化为列表并返回"""
             del recv["code"]
             files_id = list(recv["dir_data"].keys())
+            parent_dir_id = ''
             for index, i in enumerate(list(recv["dir_data"].values())):
+                is_parent = False
                 try:
                     time_string = time.strftime("%Y-%m-%d %H:%M:%S",
                                                 time.localtime(i['properties']["created_time"]))
@@ -240,23 +266,25 @@ class MainClient:
                             size = f"{size:.2f} {size_units[i_index]}"
                             break
                 except (ValueError, TypeError):
-                    size = "Unknown"
+                    size = "---"
+                if i.get("parent", False):
+                    is_parent = True
                     # 名称|类型|大小|权限|原始大小|id
                 file_info = {"name": i.get("name", "Untitled"), "type": i.get("type", "Unknown"),
                              "transformed_size": size, "create_time": time_string,
                              "permission": i.get("permission", "Unknown"), "primary_size": primary_size,
                              "file_id": files_id[index]}
-                if file_info["file_id"]:
+                if not is_parent:
                     self.files_information.append(file_info)
-                for file in self.files_information:
-                    if file["type"] == "dir":
-                        file["transformed_size"] = "---"
+                else:
+                    parent_dir_id = files_id[index]
+            for en, i in enumerate(self.files_information):
+                i["parent_id"] = parent_dir_id
             return self.files_information
 
         def get_recv(signal):
             self.sub_thread.signal.disconnect(get_recv)
             recv = self.check_signal_recv(signal)
-            self.main_w.file_page.loadProgressBar.stop()
             if recv:
                 if recv["recv"]["code"] == 0:
                     result = transform_file_dict(recv["recv"])
@@ -347,12 +375,14 @@ class MainClient:
             self.sub_thread.signal.disconnect()
         except TypeError:
             pass
-        ftp_file_io = FtpFilesDownloadManager()
-        ftp_task = ClientFtpThread(address=(self.ftp_host, self.ftp_port))
         file = self.files_information[file_index]
-        file_id = file['file_id']
+
+        ftp_file_io = FtpFilesManager()
         file_name = str(file['name'])
         file_size = int(file['primary_size'])
+        result = ftp_file_io.load_file(FtpFilesManager.WRITE, file_name, file_size)
+
+        ftp_task = ClientFtpTask((self.ftp_host, self.ftp_port), ClientFtpTask.DOWNLOAD_FILE)
 
         def __ftp_respond(signal):  # 结果处理
             try:
@@ -363,7 +393,7 @@ class MainClient:
                 if signal["error"] == "FEE":
                     info_message_display(self.main_w, title="注意", information="文件已存在")
                 else:
-                    info_message_display(self.main_w, title="未知错误", information=signal["error"])
+                    info_message_display(self.main_w, title="未知错误", information=str(signal["error"]))
 
         def __get_recv(signal):
             self.sub_thread.signal.disconnect(__get_recv)
@@ -374,15 +404,16 @@ class MainClient:
                     task_id = recv["recv"]["data"]["task_id"]
                     task_token = recv["recv"]["data"]["task_token"]
                     ftp_file_names = recv["recv"]["data"]["t_filename"]  # ftp文件名(字典)
-                    ftp_task.load_ftp_obj(action="download_file", args=(ftp_file_io, task_id, task_token,
-                                                                        ftp_file_names, file_size, False))
+                    ftp_file_name = list(ftp_file_names.values())[0]
+                    ftp_task.load_task(task_id, task_token, ftp_file_io, ftp_file_name)
+
                     ftp_task.ftp_signal.connect(__ftp_respond)
                     ftp_task.start()
 
         # send request
-        result = ftp_file_io.load_file(action="download", file=file_name)
         if result["state"]:
-            self.sub_thread.load_sub_thread(2, request="operateFile", data={"action": "read", "file_id": file_id})
+            self.sub_thread.load_sub_thread(2, request="operateFile",
+                                            data={"action": "read", "file_id": file['file_id']})
             self.sub_thread.signal.connect(__get_recv)
             self.sub_thread.start()
         else:
@@ -392,12 +423,16 @@ class MainClient:
         ...
 
     def upload_file_function(self, file_path: str):
+        """上传文件"""
         try:
             self.sub_thread.signal.disconnect()
         except TypeError:
             pass
-        ftp_file_io = FtpFilesDownloadManager()
-        ftp_task = ClientFtpThread(address=(self.ftp_host, self.ftp_port))
+        ftp_file_io = FtpFilesManager()
+        file_size = int(os.path.getsize(file_path))
+        result = ftp_file_io.load_file(FtpFilesManager.READ, file_path, file_size)
+
+        ftp_task = ClientFtpTask((self.ftp_host, self.ftp_port), ClientFtpTask.UPLOAD_FILE)
 
         def __ftp_respond(signal):
             try:
@@ -415,10 +450,9 @@ class MainClient:
                 if recv["recv"]['code'] == 0:
                     task_id = recv["recv"]["data"]["task_id"]
                     task_token = recv["recv"]["data"]["task_token"]
-                    ftp_file_names = recv["recv"]["data"]["t_filename"]  # 要上传的ftp文件名(字典)
-                    file_size = int(os.path.getsize(file_path))
-                    ftp_task.load_ftp_obj(action="upload_file", args=(ftp_file_io, task_id, task_token,
-                                                                      ftp_file_names, file_size, False))
+                    ftp_file_names = recv["recv"]["data"]["t_filename"]  # ftp文件名(字典)
+                    ftp_file_name = list(ftp_file_names.values())[0]
+                    ftp_task.load_task(task_id, task_token, ftp_file_io, ftp_file_name)
                     ftp_task.ftp_signal.connect(__ftp_respond)
                     ftp_task.start()
                 if recv["recv"]['code'] == -1:
@@ -426,7 +460,7 @@ class MainClient:
 
         file_name = str(os.path.basename(file_path))
         file_names = [f["name"] for f in self.files_information]
-        result = ftp_file_io.load_file(action="upload", file=file_path)
+
         if result["state"]:
             self.sub_thread.signal.connect(__get_recv)
             if not (file_name in file_names):
