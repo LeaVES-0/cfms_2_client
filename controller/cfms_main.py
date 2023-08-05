@@ -16,7 +16,7 @@ from qfluentwidgets import FluentTranslator
 from controller.cfms_user import CfmsUserManager
 from scripts.client_thread import ClientSubThread, ClientFtpTask
 from scripts.fileio import FtpFilesManager
-from scripts.method import info_message_display
+from scripts.method import info_message_display, FILE_TYPES
 from scripts.windows import LoginUI, MainUI, MessageDisplay
 
 
@@ -36,12 +36,15 @@ class MainClient:
                                         'upload_file_function': self.upload_file_function,
                                         'create_new_dir_function': self.create_new_dir_function},
                              thread=self.sub_thread)
-        self.public_key = None
-        self._is_cancel_link = False  # 是否取消连接的内部特性
-        self.files_information = []
         translator = FluentTranslator(QLocale())
         self.login_w.setLoginState(0)
         self.QtApp.installTranslator(translator)
+
+        self.public_key = None
+        self._is_cancel_link = False  # 是否取消连接的内部特性
+        self._force_save_user_account = False
+        self.files_information = []
+        self.tasks = []
 
         self.__login_ui_set_buttons()
         server_items = [i[0] for i in self.usermanager.saved_servers]
@@ -93,7 +96,7 @@ class MainClient:
 
     def __check_link_state(self, args: dict):
         """检测连接状态"""
-        self.public_key = args["public_key"]
+        self.public_key = args.get("public_key", '')
         state = args["clientState"]
         server_address = args["address"]
         self.login_w.loadProgressBar.stop()
@@ -101,7 +104,7 @@ class MainClient:
         self.login_w.link_cancel_button.setEnabled(False)
         if state:
             self.ftp_host = server_address[0]
-            self.usermanager.remember_linked_server(address=list(server_address))  # 储存连接成功的服务器信息
+            self.usermanager.remember_linked_server(address=server_address)  # 储存连接成功的服务器信息
             print(f"Server state: 0. \nLink successful.")
             info_message_display(self.login_w, information_type="info", whereis="TOP_LEFT", title="连接成功!")
             if args["isFirstTimeConnection"]:
@@ -117,7 +120,7 @@ class MainClient:
                     break
 
             def logout():
-                self.usermanager.remember_logined_user([saved_users[1], None])
+                self.usermanager.remember_logined_user((saved_users[1], None))
                 self.login_w.checkBox_remember_uer.setChecked(False)
                 self.login_w.setLoginState(1)
 
@@ -126,12 +129,14 @@ class MainClient:
                 self.login_w.login_directly_button.clicked.connect(
                     lambda: self.user_login_function((saved_users[1], last_login_password), True))
                 self.login_w.login_out_Button.clicked.connect(lambda: logout())
-                self.login_w.checkBox_remember_uer.setChecked(True)
+                self._force_save_user_account = True
                 self.login_w.setLoginState(2)
             else:
                 self.login_w.setLoginState(1)
-                self.login_w.userNameLE.addItems(saved_users[0][0])
-                self.login_w.userNameLE.setCurrentIndex(0)
+                if saved_users[0]:
+                    users = [u for u in saved_users[0]]
+                    self.login_w.userNameLE.addItems(users)
+                    self.login_w.userNameLE.setCurrentIndex(0)
 
         else:
             if not args["isSameKey"]:
@@ -171,11 +176,11 @@ class MainClient:
                 username = login_information[0]
                 hashed_password = login_information[1]
                 self.sub_thread.set_auth(user=username, token=user_token)
-                if self.login_w.checkBox_remember_uer.isChecked():
+                if self.login_w.checkBox_remember_uer.isChecked() or self._force_save_user_account:
                     # 是否保存密码
-                    self.usermanager.remember_logined_user([username, hashed_password])
+                    self.usermanager.remember_logined_user((username, hashed_password))
                 else:
-                    self.usermanager.remember_logined_user([username, None])
+                    self.usermanager.remember_logined_user((username, None))
                 self.login_w.checkBox_remember_uer.setChecked(False)
 
             elif recv_from_server["code"] == 401:
@@ -248,36 +253,46 @@ class MainClient:
             del recv["code"]
             files_id = list(recv["dir_data"].keys())
             parent_dir_id = ''
+            size_units = ("B", "KB", "MB", "GB", "TB", "PB")
             for index, i in enumerate(list(recv["dir_data"].values())):
-                is_parent = False
                 try:
                     time_string = time.strftime("%Y-%m-%d %H:%M:%S",
                                                 time.localtime(i['properties']["created_time"]))
                 except KeyError:
                     time_string = "Unknown"
-                size_units = ["B", "KB", "MB", "GB", "TB", "PB"]
-                primary_size = 0
-                try:
-                    primary_size = size = int(i["properties"].get("size", "Unknown"))
-                    for i_index in range(0, 6):
-                        if size >= 1024:
-                            size /= 1024
-                        else:
-                            size = f"{size:.2f} {size_units[i_index]}"
-                            break
-                except (ValueError, TypeError):
-                    size = "---"
-                if i.get("parent", False):
-                    is_parent = True
-                    # 名称|类型|大小|权限|原始大小|id
-                file_info = {"name": i.get("name", "Untitled"), "type": i.get("type", "Unknown"),
-                             "transformed_size": size, "create_time": time_string,
-                             "permission": i.get("permission", "Unknown"), "primary_size": primary_size,
-                             "file_id": files_id[index]}
-                if not is_parent:
-                    self.files_information.append(file_info)
+                file_type = i.get("type", "Unknown")
+                primary_size = display_size = int(i["properties"].get("size", 0))
+                for i_index in range(0, 6):
+                    if display_size < 0:
+                        display_size = "Unavailable"
+                        break
+                    if display_size >= 1024:
+                        display_size /= 1024
+                    else:
+                        display_size = f"{display_size:.2f} {size_units[i_index]}"
+                        break
+                file_name = i.get("name", "Untitled")
+                if file_type == "file":
+                    suffix = os.path.splitext(file_name)[-1].strip(".")
+                    specific_file_type = FILE_TYPES.get(suffix, suffix + " File")
+                elif file_type == "dir":
+                    specific_file_type = "File folder"
+                    primary_size = None
+                    display_size = "---"
                 else:
+                    specific_file_type = "Unknown"
+                file_info = {"name": file_name,
+                             "type": file_type,
+                             "specific_type": specific_file_type,
+                             "size_transformed": display_size,
+                             "primary_size": primary_size,
+                             "time_created": time_string,
+                             "permission": i.get("permission", "Unknown"),
+                             "file_id": files_id[index]}
+                if i.get("parent", False):
                     parent_dir_id = files_id[index]
+                else:
+                    self.files_information.append(file_info)
             for en, i in enumerate(self.files_information):
                 i["parent_id"] = parent_dir_id
             return self.files_information

@@ -27,7 +27,7 @@ class CfmsUserManager:
         self.client_memory = self.data_mod.setdefault("client_memory", {})
         self.client_config = self.data_mod.setdefault('client_config', {})
 
-    def remember_linked_server(self, address: list):
+    def remember_linked_server(self, address: tuple):
         """记住登录成功的服务器"""
         self.__refresh_data()
         already_saved = False
@@ -44,7 +44,7 @@ class CfmsUserManager:
             self.client_memory['servers'].append({"server_address": address, "users": []})
         self.data_file.w_datafile(self.data_mod)
 
-    def remember_logined_user(self, account: list):
+    def remember_logined_user(self, account: tuple):
         """记住登录成功的用户"""
         self.__refresh_data()
         changed = False
@@ -64,12 +64,14 @@ class CfmsUserManager:
                     server["users"].append(account)
         self.data_file.w_datafile(self.data_mod)
 
-    def get_saved_servers(self):
+    @property
+    def saved_servers(self):
         self.__refresh_data()
         server_addresses = [s["server_address"] for s in self.client_memory["servers"]]
         return server_addresses
 
-    def get_saved_users(self):
+    @property
+    def saved_users(self):
         # 连接成功后可用
         self.__refresh_data()
         users = []
@@ -80,6 +82,3 @@ class CfmsUserManager:
                 users = [user for user in server["users"]]
                 break
         return users, last_login
-
-    saved_servers = property(get_saved_servers)
-    saved_users = property(get_saved_users)

@@ -28,15 +28,15 @@ DEFAULT_PORT = 5103
 class Client:
     def __init__(self):
         ftplib.FTP_TLS.ssl_version = ssl.PROTOCOL_TLSv1_2
-        self.client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.client.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, True)
-        self.client.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, True)
-        socket.setdefaulttimeout(30)
+        socket.setdefaulttimeout(40)
         self._is_linked = False  # 内部连接状态特性
         self.AEC_key = None
         self.cfms_dict_to_send = {"version": 1, "request": "", "data": {}}
         self.pem_file = None
         self.ftp_port = None  # 会在主逻辑文件中重新赋值
+        self.client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.client.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, True)
+        self.client.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, True)
 
     def cfms_AES_encrypt(self, data):
         """AES加密"""
@@ -54,9 +54,12 @@ class Client:
 
     def cfms_recvall(self, crypt: bool = True):
         self.client.settimeout(40)
-        primary_data = self.client.recv(1024)
-        if [primary_data][0] in (0, -1):  # 返回0,-1代表出错
-            raise ConnectionError
+        try:
+            primary_data = self.client.recv(1024)
+        except Exception as e:
+            raise e
+        if [primary_data][0] == 0:  # 返回0,-1代表出错
+            raise ConnectionError("socket_closed")
         self.client.setblocking(False)
         while True:
             try:
@@ -72,7 +75,7 @@ class Client:
         pprint.pprint(recv)
         return recv
 
-    recv_data = property(cfms_recvall, )
+    recv_data = property(cfms_recvall)
 
     def __cfms_send(self, request, crypt: bool = True):
         pprint.pprint(request)
@@ -121,7 +124,7 @@ class Client:
                 self.ftp_host = host
                 return {"clientState": True, "address": (host, port),
                         "isFirstTimeConnection": first_time_connection, "public_key": public_key}
-        except (TypeError, ValueError, OSError, UnboundLocalError, ConnectionRefusedError, ConnectionError) as e:
+        except (TimeoutError, TypeError, ValueError, OSError, ConnectionRefusedError, ConnectionError) as e:
             return {"clientState": False, "address": (host, port),
                     "isFirstTimeConnection": first_time_connection, "isSameKey": True, "public_key": public_key,
                     "error": e}
@@ -246,18 +249,19 @@ class ClientFtpTask(QThread):
     UPLOAD_FILE = "UPLOAD_FILE"
     DOWNLOAD_FILE = "DOWNLOAD_FILE"
 
-    def __init__(self, address: tuple, mode):
+    def __init__(self, address: tuple, mode, obj_name: str = ""):
         super().__init__(None)
         self.loaded = False
         self._thread_run = True
         self.ftp_address = address
         self.task_mode = mode
+        self.setObjectName(obj_name)
         self.ftp_obj = ftplib.FTP_TLS()
         self.ftp_obj.debug(0)
 
     @property
     def task_info(self):
-        return {"mode": self.task_mode}
+        return {"mode": self.task_mode, "name": self.objectName()}
 
     def load_task(self, _task_id, _task_token, task_fileio: FtpFilesManager, file_name=None):
         self.loaded = True
@@ -292,17 +296,36 @@ class ClientFtpTask(QThread):
             self._thread_run = False
 
     def get_transport_progress(self, file_io: FtpFilesManager):
+        size_units = ["B/s", "KB/s", "MB/s", "GB/s", "TB/s", "PB/s"]
+        last_bytes = 0
+        tar2 = tar1 = 0
+        velocity = 0
         while self._thread_run:
-            progress = round(100 * file_io.transport_bytes / file_io.file_size, 2)
-            # self.ftp_progress_signal.emit(progress)
-            print(f"\r {progress}%", end=' ')
+            tar0 = time.perf_counter()
+            current_bytes = file_io.transport_bytes
+            try:
+                velocity = (current_bytes - last_bytes) / (tar1 - tar2)
+                for i_index in range(0, 6):
+                    if velocity >= 1024:
+                        velocity /= 1024
+                    else:
+                        velocity = f"{velocity:.1f} {size_units[i_index]}"
+                        break
+            except ZeroDivisionError:
+                ...
+            last_bytes = current_bytes
+            progress = round(100 * current_bytes / file_io.file_size, 2)
+            self.ftp_progress_signal.emit(progress)
+            print(f"\r progress: {progress}%  velocity: {velocity}", end=' ')
             if int(progress) == 100:
                 print(f"100.00%", end=' ')
                 sys.stdout.flush()
                 break
 
             sys.stdout.flush()
+            tar2 = tar0
             time.sleep(0.1)
+            tar1 = time.perf_counter()
 
     def run(self):
         if not self.loaded:

@@ -4,11 +4,13 @@
 # @FileName: file_page.py
 # coding: utf-8
 
+import os.path
+
 from PyQt6.QtCore import *
 from PyQt6.QtWidgets import *
 from qfluentwidgets import *
 
-from scripts.method import info_message_display
+from scripts.method import info_message_display, FILE_TYPES
 
 
 # noinspection PyTypeChecker
@@ -190,17 +192,18 @@ class FilePage(QWidget):
             self.table_view.setColumnCount(1)
             self.table_view.setRowCount(0)
             self.table_view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-            self.table_view.setHorizontalHeaderLabels(["No File"])  # 行标题
+            self.table_view.setHorizontalHeaderLabels(["This folder is empty."])  # 行标题
         elif files:
             self.table_view.setColumnCount(5)
             self.table_view.setRowCount(len(files))
             self.table_view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
             self.table_view.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
-            self.table_view.setHorizontalHeaderLabels(['FileName', 'Type', 'Size', 'Create Date', 'Permission'])
+            self.table_view.setHorizontalHeaderLabels(['Name', 'Date created', 'Type', 'Size', 'Permission'])
             for row, file_info in enumerate(self.file_information):
                 for column in range(5):
-                    file_info_list = [file_info["name"], file_info["type"], file_info["transformed_size"],
-                                      file_info["create_time"], file_info["permission"]]
+                    file_info_list = [file_info["name"], file_info["time_created"],
+                                      file_info["specific_type"], file_info["size_transformed"],
+                                      file_info["permission"]]
                     self.table_view.setItem(row, column,
                                             self.__create_list_item(file_info_list[column], column, file_info["type"]))
 
@@ -230,6 +233,8 @@ class FilePage(QWidget):
         if self.rename_arg and not self.create_new_arg:
             data = str(self.table_view.item(row, column).text())
             self.file_information[row]["name"] = data
+            _type = os.path.splitext(data)[-1].strip(".")
+            self.table_view.item(row, 2).setText(FILE_TYPES.get(_type, _type + " File"))
             self.file_rename_function(data=data, file_index=row)
         self.rename_arg = False
 
