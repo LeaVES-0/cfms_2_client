@@ -6,10 +6,11 @@
 
 from qfluentwidgets import *
 
-FILE_TYPES = {"txt": "Test document",
+FILE_TYPES = {"txt": "Text document",
               "rar": "Roshal Archive ",
               "zip": "Compressed(zipped) folder",
               "iso": "Disc image File",
+              "img": "Disc image File",
               "exe": "Windows executable program file",
               "py": "Python",
               "jar": "Java",

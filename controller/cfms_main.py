@@ -134,8 +134,8 @@ class MainClient:
             else:
                 self.login_w.setLoginState(1)
                 if saved_users[0]:
-                    users = [u for u in saved_users[0]]
-                    self.login_w.userNameLE.addItems(users)
+                    display_users = [u[0] for u in saved_users[0]]
+                    self.login_w.userNameLE.addItems(display_users)
                     self.login_w.userNameLE.setCurrentIndex(0)
 
         else:
@@ -181,6 +181,7 @@ class MainClient:
                     self.usermanager.remember_logined_user((username, hashed_password))
                 else:
                     self.usermanager.remember_logined_user((username, None))
+                self._force_save_user_account = False
                 self.login_w.checkBox_remember_uer.setChecked(False)
 
             elif recv_from_server["code"] == 401:
@@ -273,7 +274,7 @@ class MainClient:
                         break
                 file_name = i.get("name", "Untitled")
                 if file_type == "file":
-                    suffix = os.path.splitext(file_name)[-1].strip(".")
+                    suffix = os.path.splitext(file_name)[-1].strip(".").lower()
                     specific_file_type = FILE_TYPES.get(suffix, suffix + " File")
                 elif file_type == "dir":
                     specific_file_type = "File folder"

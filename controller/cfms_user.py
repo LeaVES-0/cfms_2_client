@@ -35,7 +35,7 @@ class CfmsUserManager:
         servers = [i for i in self.client_memory.setdefault("servers", [])]
         if self.client_memory["servers"]:
             for index, server in enumerate(servers):
-                if address == server["server_address"]:
+                if address == tuple(server["server_address"]):
                     already_saved = True
                     break
             if not already_saved:
@@ -49,7 +49,7 @@ class CfmsUserManager:
         self.__refresh_data()
         changed = False
         for server in self.client_memory["servers"]:
-            if server["server_address"] == self.server_address:
+            if tuple(server["server_address"]) == self.server_address:
                 server["last_login"] = account[0]
                 if server.setdefault('users', []):
                     users = [i for i in server['users']]
@@ -77,7 +77,7 @@ class CfmsUserManager:
         users = []
         last_login = None
         for server in [s for s in self.client_memory["servers"]]:
-            if server["server_address"] == self.server_address:
+            if tuple(server["server_address"]) == self.server_address:
                 last_login = server.get("last_login", None)
                 users = [user for user in server["users"]]
                 break

@@ -24,7 +24,6 @@ class FilePage(QWidget):
         self.path = [('', '<ROOT>'), ]
         self.current_path = ('', '<ROOT>')
         self.rename_arg = False
-        self.create_new_arg = False
         self.loadProgressBar = IndeterminateProgressBar(self, start=False)
 
     def setup_ui(self, functions=None):
@@ -106,7 +105,7 @@ class FilePage(QWidget):
         self.table_view.setObjectName("table_file_view")
         self.table_view.setWordWrap(True)
         self.table_view.setHorizontalHeaderLabels(['', 'FileName', 'Type', 'Size', 'Create Date', 'Permission'])  # 行标题
-        self.table_view.cellDoubleClicked.connect(self.into_dir_action)
+        self.table_view.cellDoubleClicked.connect(self.cellDoubleClicked_action)
         self.table_view.cellChanged.connect(self.rename_action)
         self.table_view.clear()
         # 允许打开上下文菜单
@@ -179,11 +178,14 @@ class FilePage(QWidget):
             item.setToolTip(info)
         return item
 
+    # @signal_blocker
     def __set_files_list(self, files: list):
         """设置文件列表"""
+        self.table_view.blockSignals(True)
         self.loadProgressBar.stop()
         self.table_view.verticalHeader().setDefaultSectionSize(60)
         if files == self.file_information:
+            self.table_view.blockSignals(False)
             return
         self.file_information = files
         self.table_view.clear()
@@ -206,6 +208,7 @@ class FilePage(QWidget):
                                       file_info["permission"]]
                     self.table_view.setItem(row, column,
                                             self.__create_list_item(file_info_list[column], column, file_info["type"]))
+        self.table_view.blockSignals(False)
 
     def change_dir_level(self, action: bool):
         if action:
@@ -217,9 +220,8 @@ class FilePage(QWidget):
                 self.current_path = ('', '<ROOT>')
                 self.get_files_function()
 
-    def into_dir_action(self, row, column):
-        """进入目录"""
-        self.rename_arg = True
+    def cellDoubleClicked_action(self, row, column):
+        """双击事件处理"""
         if not column == 0:
             if self.file_information[row]["type"] == "dir":
                 dir_id = self.file_information[row].get("file_id", "")
@@ -228,15 +230,18 @@ class FilePage(QWidget):
                 self.current_path = (dir_id, dir_name)
                 self.path.append(self.current_path)
 
+    # @signal_blocker
     def rename_action(self, row, column):
         """rename"""
-        if self.rename_arg and not self.create_new_arg:
-            data = str(self.table_view.item(row, column).text())
-            self.file_information[row]["name"] = data
-            _type = os.path.splitext(data)[-1].strip(".")
-            self.table_view.item(row, 2).setText(FILE_TYPES.get(_type, _type + " File"))
-            self.file_rename_function(data=data, file_index=row)
-        self.rename_arg = False
+        self.table_view.blockSignals(True)
+        data = str(self.table_view.item(row, column).text())
+        self.file_information[row]["name"] = data
+        self.file_rename_function(data=data, file_index=row)
+        if self.file_information[row]["type"] == "file":
+            _type = os.path.splitext(data)[-1].strip(".").lower()
+            file_type = self.file_information[row]["specific_type"] = FILE_TYPES.get(_type, _type + " File")
+            self.table_view.item(row, 2).setText(file_type)
+        self.table_view.blockSignals(False)
 
     def create_new_file_action(self, file_type: str = "folder"):
         """新建文件夹"""
