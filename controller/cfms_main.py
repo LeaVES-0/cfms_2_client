@@ -8,22 +8,25 @@
 import os
 import sys
 import time
+import hashlib
 
 from PyQt6.QtCore import *
 from PyQt6.QtWidgets import QApplication
-from qfluentwidgets import FluentTranslator
+from qfluentwidgets import FluentTranslator, Theme
 
 from controller.cfms_user import CfmsUserManager
 from scripts.client_thread import ClientSubThread, ClientFtpTask
 from scripts.fileio import FtpFilesManager
-from scripts.method import info_message_display, FILE_TYPES
-from scripts.windows import LoginUI, MainUI, MessageDisplay
+from scripts.method import FILE_TYPES
+from scripts.uie import info_message_display, MessageDisplay
+from scripts.windows import LoginUI, MainUI
 
 
-class MainClient:
+class MainClient(QObject):
     """客户端主类"""
 
     def __init__(self):
+        super().__init__(None)
         self.sub_thread = ClientSubThread()
         self.usermanager = CfmsUserManager()
         self.QtApp = QApplication(sys.argv)
@@ -54,17 +57,16 @@ class MainClient:
     def show_public_key_meg(self):
         title = 'The Public Key of the Server:'
         content = f"{self.public_key}"
-        w = MessageDisplay(title, content, parent=self.login_w, btn_display=(False, True), btn_text=("", "OK"))
+        w = MessageDisplay(title, content, parent=self.login_w, btn_text=("OK",))
         w.exec()
 
-    def __diff_public_key_meg(self):
+    def __different_public_key_warn(self):
         title = 'The Public Key of the Server:'
         content = f"""服务器上的公钥与本地不同,这可能意味着服务器已被重置。
 但若非如此,则意味着您可能已遭受中间人攻击。
 获取的服务器公钥:
 {self.public_key}"""
-        w = MessageDisplay(title, content, parent=self.login_w, btn_display=(True, True),
-                           btn_text=("断开连接", "更换公钥"))
+        w = MessageDisplay(title, content, parent=self.login_w, btn_text=("断开连接", "更换公钥"))
         if w.exec():
             self.close_connection_function()
         else:
@@ -94,6 +96,7 @@ class MainClient:
         self.login_w.link_cancel_button.clicked.connect(self.cancel_link)
         self.login_w.back_Button_2.clicked.connect(lambda: self.close_connection_function())
 
+    @pyqtSlot(object, name="SOLT:check_link_state")
     def __check_link_state(self, args: dict):
         """检测连接状态"""
         self.public_key = args.get("public_key", '')
@@ -126,8 +129,16 @@ class MainClient:
 
             if saved_users[1] and last_login_password:
                 self.login_w.show_user_name.setText(f"User: {saved_users[1]}")
+                try:
+                    self.login_w.login_directly_button.clicked.disconnect()
+                except:
+                    ...
                 self.login_w.login_directly_button.clicked.connect(
                     lambda: self.user_login_function((saved_users[1], last_login_password), True))
+                try:
+                    self.login_w.login_out_Button.clicked.disconnect()
+                except:
+                    ...
                 self.login_w.login_out_Button.clicked.connect(lambda: logout())
                 self._force_save_user_account = True
                 self.login_w.setLoginState(2)
@@ -142,7 +153,7 @@ class MainClient:
             if not args["isSameKey"]:
                 info_message_display(self.login_w, duration_time=1500, information_type="warn", whereis="TOP_RIGHT",
                                      title=" 公钥异常")
-                self.__diff_public_key_meg()
+                self.__different_public_key_warn()
             else:
 
                 if not self._is_cancel_link:
@@ -151,13 +162,21 @@ class MainClient:
                 self._is_cancel_link = False
         self.sub_thread.signal.disconnect(self.__check_link_state)  # 断开信号槽连接
 
+    def check_signal_recv(self, signal):
+        """检测函数执行状态码,执行成功返回服务器响应"""
+        if signal["state"]:
+            return signal["recv"]
+        else:
+            error = signal["error"]
+            if type(error) == ValueError:
+                info_message_display(self.main_w, information_type="error", whereis="TOP_LEFT", title="Server error",
+                                     information=f"服务器错误:{error!s}")
+            return None
+
+    @pyqtSlot(object, name="SOLT:check_login_state")
     def __check_login_state(self, signal: dict):
         """检测登陆状态"""
-        self.login_w.loadProgressBar.stop()
-        self.login_w.login_Button.setEnabled(True)
-        self.login_w.back_Button.setEnabled(True)
-        if signal["loginState"]:
-            recv_from_server = signal["recv"]  # 服务器返回值
+        if (recv_from_server:=self.check_signal_recv(signal)):
             if recv_from_server["code"] == 0:
                 # 登录成功
                 self.login_w.login_finished = True
@@ -166,16 +185,16 @@ class MainClient:
                 # 设置窗口
                 self.login_w.close()
                 # 同步主题
-                self.main_w.interface_theme = self.login_w.interface_theme
+                if self.login_w.themeState() == Theme.DARK:
+                    self.main_w.setThemeState(Theme.DARK)
                 self.main_w.mainUI()
                 info_message_display(self.main_w, information_type="info", whereis="TOP_RIGHT",
                                      title="登录成功!", duration_time=2000)
 
-                login_information = signal['account']  # 存有用户账户的元组
-                user_token = recv_from_server["token"]  # 获取到token
-                username = login_information[0]
-                hashed_password = login_information[1]
-                self.sub_thread.set_auth(user=username, token=user_token)
+                username = self._login_info[0]
+                hashed_password = self._login_info[1]
+                del self._login_info
+                self.sub_thread.set_auth(user=username, token=recv_from_server["token"]) # 获取到token
                 if self.login_w.checkBox_remember_uer.isChecked() or self._force_save_user_account:
                     # 是否保存密码
                     self.usermanager.remember_logined_user((username, hashed_password))
@@ -189,10 +208,10 @@ class MainClient:
                 msg = recv_from_server.get("msg", '')
                 info_message_display(self.login_w, information_type="warn", whereis="TOP_RIGHT", title="登陆失败。",
                                      information=f"密码错误:{msg!s}")
-        elif not signal["loginState"]:
-            # 其他异常
-            info_message_display(self.login_w, information_type="error", whereis="TOP_RIGHT", title="错误",
-                                 information=f"{signal['error']!s}")
+        self.login_w.loadProgressBar.stop()
+
+        self.login_w.login_Button.setEnabled(True)
+        self.login_w.back_Button.setEnabled(True)
         self.sub_thread.signal.disconnect(self.__check_login_state)  # 不管登录成功与否,都断开信号槽连接
 
     def link_server_function(self, address: tuple):
@@ -216,7 +235,7 @@ class MainClient:
             self.sub_thread.signal.connect(self.__check_link_state)
             self.sub_thread.start()
 
-    def user_login_function(self, account: tuple, hashed: bool = False):
+    def user_login_function(self, account: tuple, unhash: bool = False):
         """登录"""
         if not account[0] or not account[1]:
             info_message_display(self.login_w, information_type="warn", whereis="TOP_RIGHT", title="警告",
@@ -226,19 +245,16 @@ class MainClient:
             self.login_w.loadProgressBar.start()  # 禁用按键,开启进度条
             self.login_w.login_Button.setEnabled(False)
             self.login_w.back_Button.setEnabled(False)
-            self.sub_thread.load_sub_thread(action=1, name=account[0], password=account[1], hashed=hashed)
+            password = account[1]
+            if not unhash:
+                sha256_obj = hashlib.sha256()
+                sha256_obj.update(password.encode())
+                password = sha256_obj.hexdigest()
+            self.sub_thread.load_sub_thread(action=ClientSubThread.REQUEST, request="login",
+                                            data={"username": f'{account[0]}', "password": f'{password}'})
+            self._login_info = account
             self.sub_thread.signal.connect(self.__check_login_state)
             self.sub_thread.start()
-
-    def check_signal_recv(self, signal):
-        if signal["state"]:
-            return signal
-        else:
-            error = signal["error"]
-            if type(error) == ValueError:
-                info_message_display(self.main_w, information_type="error", whereis="TOP_LEFT", title="Server error",
-                                     information=f"服务器错误:{error!s}")
-            return None
 
     def get_dir_function(self, dir_id: str = ''):
         self.current_dir_id = dir_id
@@ -275,7 +291,7 @@ class MainClient:
                 file_name = i.get("name", "Untitled")
                 if file_type == "file":
                     suffix = os.path.splitext(file_name)[-1].strip(".").lower()
-                    specific_file_type = FILE_TYPES.get(suffix, suffix + " File")
+                    specific_file_type = FILE_TYPES.get(suffix, suffix.upper() + " File")
                 elif file_type == "dir":
                     specific_file_type = "File folder"
                     primary_size = None
@@ -298,15 +314,16 @@ class MainClient:
                 i["parent_id"] = parent_dir_id
             return self.files_information
 
+        @pyqtSlot(object)
         def get_recv(signal):
             self.sub_thread.signal.disconnect(get_recv)
             recv = self.check_signal_recv(signal)
             if recv:
-                if recv["recv"]["code"] == 0:
+                if recv["code"] == 0:
                     result = transform_file_dict(recv["recv"])
                     self.main_w.file_page.set_file_tree_list(result)
 
-                elif recv["recv"]["code"] == 404:
+                elif recv["code"] == 404:
                     # 失败 设置当前目录为前一次所处目录
                     self.current_dir_id = self.main_w.file_page.last_dir_path[0]
                     self.main_w.file_page.current_path = self.main_w.file_page.last_dir_path
@@ -317,10 +334,10 @@ class MainClient:
 
         self.sub_thread.signal.connect(get_recv)
         if not dir_id:
-            self.sub_thread.load_sub_thread(request="getRootDir")
+            self.sub_thread.load_sub_thread(ClientSubThread.REQUEST, request="getRootDir")
             self.sub_thread.start()
         else:
-            self.sub_thread.load_sub_thread(request="operateDir", data={"action": "list", "dir_id": dir_id})
+            self.sub_thread.load_sub_thread(ClientSubThread.REQUEST, request="operateDir", data={"action": "list", "dir_id": dir_id})
             self.sub_thread.start()
 
     # file_index 是文件在self.files_information中的索引
@@ -331,6 +348,7 @@ class MainClient:
         except TypeError:
             ...
 
+        @pyqtSlot(object)
         def __get_recv(signal):
             self.sub_thread.signal.disconnect(__get_recv)
             recv = self.check_signal_recv(signal)
@@ -339,7 +357,8 @@ class MainClient:
 
         if not data:
             data = "New Folder " + time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time.time()))
-        self.sub_thread.load_sub_thread(request="createDir", data={"parent_id": self.current_dir_id, "name": data})
+        self.sub_thread.load_sub_thread(ClientSubThread.REQUEST, request="createDir",
+                                         data={"parent_id": self.current_dir_id, "name": data})
         self.sub_thread.signal.connect(__get_recv)
         self.sub_thread.start()
 
@@ -357,11 +376,11 @@ class MainClient:
             if recv:
                 ...
         if obj_type == "dir":
-            self.sub_thread.load_sub_thread(request="operateDir", data={"dir_id": file_id, "action": 'rename',
-                                                                        'new_dirname': data})
+            self.sub_thread.load_sub_thread(ClientSubThread.REQUEST, request="operateDir",
+                                            data={"dir_id": file_id, "action": 'rename', 'new_dirname': data})
         elif obj_type == "file":
-            self.sub_thread.load_sub_thread(request="operateFile", data={"file_id": file_id, "action": 'rename',
-                                                                         'new_filename': data})
+            self.sub_thread.load_sub_thread(ClientSubThread.REQUEST, request="operateFile",
+                                            data={"file_id": file_id, "action": 'rename', 'new_filename': data})
         self.sub_thread.signal.connect(__get_recv)
         self.sub_thread.start()
 
@@ -373,6 +392,7 @@ class MainClient:
         obj_type = self.files_information[file_index]["type"]
         file_id = self.files_information[file_index]["file_id"]
 
+        @pyqtSlot(object)
         def __get_recv(signal):
             self.sub_thread.signal.disconnect(__get_recv)
             recv = self.check_signal_recv(signal)
@@ -398,36 +418,32 @@ class MainClient:
         file_size = int(file['primary_size'])
         result = ftp_file_io.load_file(FtpFilesManager.WRITE, file_name, file_size)
 
-        ftp_task = ClientFtpTask((self.ftp_host, self.ftp_port), ClientFtpTask.DOWNLOAD_FILE)
-
+        @pyqtSlot(object)
         def __ftp_respond(signal):  # 结果处理
-            try:
-                ftp_task.ftp_signal.disconnect()
-            except TypeError:
-                ...
             if not signal['state']:
                 if signal["error"] == "FEE":
                     info_message_display(self.main_w, title="注意", information="文件已存在")
                 else:
                     info_message_display(self.main_w, title="未知错误", information=str(signal["error"]))
 
+        @pyqtSlot(object)
         def __get_recv(signal):
             self.sub_thread.signal.disconnect(__get_recv)
             recv = self.check_signal_recv(signal)
             if recv:
-                if recv["recv"]["code"] == 0:
+                if recv["code"] == 0:
                     # task
-                    task_id = recv["recv"]["data"]["task_id"]
-                    task_token = recv["recv"]["data"]["task_token"]
-                    ftp_file_names = recv["recv"]["data"]["t_filename"]  # ftp文件名(字典)
+                    task_id = recv["data"]["task_id"]
+                    task_token = recv["data"]["task_token"]
+                    ftp_file_names = recv["data"]["t_filename"]  # ftp文件名(字典)
                     ftp_file_name = list(ftp_file_names.values())[0]
                     ftp_task.load_task(task_id, task_token, ftp_file_io, ftp_file_name)
-
-                    ftp_task.ftp_signal.connect(__ftp_respond)
                     ftp_task.start()
 
         # send request
         if result["state"]:
+            ftp_task = ClientFtpTask((self.ftp_host, self.ftp_port), ClientFtpTask.DOWNLOAD_FILE)
+            ftp_task.connect(__ftp_respond)
             self.sub_thread.load_sub_thread(2, request="operateFile",
                                             data={"action": "read", "file_id": file['file_id']})
             self.sub_thread.signal.connect(__get_recv)
@@ -450,28 +466,25 @@ class MainClient:
 
         ftp_task = ClientFtpTask((self.ftp_host, self.ftp_port), ClientFtpTask.UPLOAD_FILE)
 
+        @pyqtSlot(object)
         def __ftp_respond(signal):
-            try:
-                ftp_task.ftp_signal.disconnect()
-            except TypeError:
-                ...
             if not signal['state']:
-                info_message_display(self.main_w, title="未知错误", information=signal["error"])
+                info_message_display(self.main_w, title="错误", information=signal["error"])
             self.get_dir_function(self.current_dir_id)
 
+        @pyqtSlot(object)
         def __get_recv(signal):
             self.sub_thread.signal.disconnect(__get_recv)
             recv = self.check_signal_recv(signal)
             if recv:
-                if recv["recv"]['code'] == 0:
-                    task_id = recv["recv"]["data"]["task_id"]
-                    task_token = recv["recv"]["data"]["task_token"]
-                    ftp_file_names = recv["recv"]["data"]["t_filename"]  # ftp文件名(字典)
+                if recv['code'] == 0:
+                    task_id = recv["data"]["task_id"]
+                    task_token = recv["data"]["task_token"]
+                    ftp_file_names = recv["data"]["t_filename"]  # ftp文件名(字典)
                     ftp_file_name = list(ftp_file_names.values())[0]
                     ftp_task.load_task(task_id, task_token, ftp_file_io, ftp_file_name)
-                    ftp_task.ftp_signal.connect(__ftp_respond)
                     ftp_task.start()
-                if recv["recv"]['code'] == -1:
+                if recv['code'] == -1:
                     info_message_display(self.main_w, information_type="warn", title="注意", information="文件被占用")
 
         file_name = str(os.path.basename(file_path))
@@ -479,6 +492,8 @@ class MainClient:
 
         if result["state"]:
             self.sub_thread.signal.connect(__get_recv)
+            ftp_task = ClientFtpTask((self.ftp_host, self.ftp_port), ClientFtpTask.DOWNLOAD_FILE)
+            ftp_task.connect(__ftp_respond)
             if not (file_name in file_names):
                 self.sub_thread.load_sub_thread(2, request="createFile",
                                                 data={"directory_id": self.current_dir_id,

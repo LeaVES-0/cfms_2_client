@@ -8,22 +8,21 @@ from PyQt6.QtCore import *
 from PyQt6.QtWidgets import *
 from qfluentwidgets import *
 
+from scripts.uie import CfmsUIBase
 from scripts.client_thread import DEFAULT_PORT
 
 
-class LoginWindow(QObject):
+class LoginWindow(CfmsUIBase):
     def __init__(self, *args, **kwargs):
         super().__init__()
-        self.label = None
-        self.widget = None
-        self.horizontalLayout = None
+        self.setup_ui()
 
-    def setup_ui(self, form):
+    def setup_ui(self):
         # 主窗口
-        self.horizontalLayout = QHBoxLayout(form)  # 全局布局
+        self.horizontalLayout = QHBoxLayout(self)  # 全局布局
         self.horizontalLayout.setContentsMargins(0, 0, 0, 0)
         self.horizontalLayout.setSpacing(0)
-        self.widget = QWidget(form)
+        self.widget = QWidget(self)
         size_policy = QSizePolicy()
         size_policy.Policy(QSizePolicy.Policy.Preferred)
         size_policy.setHorizontalStretch(0)

@@ -4,31 +4,31 @@
 # @FileName: MainWindow.py
 # coding: utf-8
 
-from PyQt6.QtCore import QMetaObject, QObject
+from PyQt6.QtCore import QMetaObject
 from PyQt6.QtWidgets import *
 from qfluentwidgets import NavigationInterface, NavigationItemPosition
 
+from scripts.uie import CfmsUIBase
 from interface.file_page import FilePage
 from interface.home_page import HomePage
 from interface.task_page import TaskPage
 
 
-class MainWindow(QObject):
+class MainWindow(CfmsUIBase):
     def __init__(self, *args, **kwargs):
         """主窗口"""
         super().__init__()
         QMetaObject.connectSlotsByName(self)
         # 创建导航栏组件
-        self.stackWidget = None
-        self.hBoxLayout = None
         self.navigationInterface = NavigationInterface(self, showMenuButton=True)
         self.home_page = HomePage("home")
         self.file_page = FilePage("file")
         self.task_page = TaskPage("task")
+        self.setup_ui()
 
-    def setup_ui(self, form):
-        self.hBoxLayout = QHBoxLayout(form)
-        self.stackWidget = QStackedWidget(form)
+    def setup_ui(self):
+        self.hBoxLayout = QHBoxLayout(self)
+        self.stackWidget = QStackedWidget(self)
         self.stackWidget.setStyleSheet("""QLabel{
             font: 13px 'Microsoft YaHei'
             }""")

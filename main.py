@@ -4,7 +4,6 @@
 # @Author  : LeaVES
 # @FileName: main.py
 # coding: utf-8
-
 from controller.cfms_main import MainClient
 
 

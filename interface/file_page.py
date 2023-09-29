@@ -10,7 +10,8 @@ from PyQt6.QtCore import *
 from PyQt6.QtWidgets import *
 from qfluentwidgets import *
 
-from scripts.method import info_message_display, FILE_TYPES
+from scripts.method import FILE_TYPES
+from scripts.uie import info_message_display
 
 
 # noinspection PyTypeChecker
@@ -220,6 +221,7 @@ class FilePage(QWidget):
                 self.current_path = ('', '<ROOT>')
                 self.get_files_function()
 
+    @pyqtSlot(int, int)
     def cellDoubleClicked_action(self, row, column):
         """双击事件处理"""
         if not column == 0:
@@ -239,7 +241,7 @@ class FilePage(QWidget):
         self.file_rename_function(data=data, file_index=row)
         if self.file_information[row]["type"] == "file":
             _type = os.path.splitext(data)[-1].strip(".").lower()
-            file_type = self.file_information[row]["specific_type"] = FILE_TYPES.get(_type, _type + " File")
+            file_type = self.file_information[row]["specific_type"] = FILE_TYPES.get(_type, _type.upper() + " File")
             self.table_view.item(row, 2).setText(file_type)
         self.table_view.blockSignals(False)
 
@@ -250,4 +252,3 @@ class FilePage(QWidget):
         self.table_view.insertRow(0)
         for column in range(5):
             self.table_view.setItem(0, column, self.__create_list_item('', column, file_type))
-
