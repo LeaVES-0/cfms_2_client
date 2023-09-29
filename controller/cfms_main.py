@@ -252,7 +252,7 @@ class MainClient(QObject):
                 password = sha256_obj.hexdigest()
             self.sub_thread.load_sub_thread(action=ClientSubThread.REQUEST, request="login",
                                             data={"username": f'{account[0]}', "password": f'{password}'})
-            self._login_info = account
+            self._login_info = (account[0], password)
             self.sub_thread.signal.connect(self.__check_login_state)
             self.sub_thread.start()
 
@@ -265,13 +265,12 @@ class MainClient(QObject):
             pass
         self.files_information = []
 
-        def transform_file_dict(recv: dict) -> list:
+        def transform_file_dict(data: dict) -> list:
             """转化为列表并返回"""
-            del recv["code"]
-            files_id = list(recv["dir_data"].keys())
+            files_id = list(data.keys())
             parent_dir_id = ''
             size_units = ("B", "KB", "MB", "GB", "TB", "PB")
-            for index, i in enumerate(list(recv["dir_data"].values())):
+            for index, i in enumerate(list(data.values())):
                 try:
                     time_string = time.strftime("%Y-%m-%d %H:%M:%S",
                                                 time.localtime(i['properties']["created_time"]))
@@ -320,7 +319,7 @@ class MainClient(QObject):
             recv = self.check_signal_recv(signal)
             if recv:
                 if recv["code"] == 0:
-                    result = transform_file_dict(recv["recv"])
+                    result = transform_file_dict(recv["dir_data"])
                     self.main_w.file_page.set_file_tree_list(result)
 
                 elif recv["code"] == 404:
