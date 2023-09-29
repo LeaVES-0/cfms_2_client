@@ -406,6 +406,7 @@ class MainClient(QObject):
         self.sub_thread.start()
 
     def download_file_function(self, file_index: int):
+        """下载文件"""
         try:
             self.sub_thread.signal.disconnect()
         except TypeError:
@@ -415,7 +416,7 @@ class MainClient(QObject):
         ftp_file_io = FtpFilesManager()
         file_name = str(file['name'])
         file_size = int(file['primary_size'])
-        result = ftp_file_io.load_file(FtpFilesManager.WRITE, file_name, file_size)
+        result = ftp_file_io.load_file(FtpFilesManager.WRITE, file_name, file_size) # 载入文件
 
         @pyqtSlot(object)
         def __ftp_respond(signal):  # 结果处理
@@ -441,7 +442,7 @@ class MainClient(QObject):
 
         # send request
         if result["state"]:
-            ftp_task = ClientFtpTask((self.ftp_host, self.ftp_port), ClientFtpTask.DOWNLOAD_FILE)
+            ftp_task = ClientFtpTask((self.ftp_host, self.ftp_port), ClientFtpTask.DOWNLOAD_FILE) # 创建task
             ftp_task.connect(__ftp_respond)
             self.sub_thread.load_sub_thread(2, request="operateFile",
                                             data={"action": "read", "file_id": file['file_id']})
@@ -461,14 +462,12 @@ class MainClient(QObject):
             pass
         ftp_file_io = FtpFilesManager()
         file_size = int(os.path.getsize(file_path))
-        result = ftp_file_io.load_file(FtpFilesManager.READ, file_path, file_size)
-
-        ftp_task = ClientFtpTask((self.ftp_host, self.ftp_port), ClientFtpTask.UPLOAD_FILE)
+        result = ftp_file_io.load_file(FtpFilesManager.READ, file_path, file_size) # 载入要上传的文件
 
         @pyqtSlot(object)
         def __ftp_respond(signal):
             if not signal['state']:
-                info_message_display(self.main_w, title="错误", information=signal["error"])
+                info_message_display(self.main_w, title="错误", information=str(signal["error"]))
             self.get_dir_function(self.current_dir_id)
 
         @pyqtSlot(object)
@@ -489,18 +488,25 @@ class MainClient(QObject):
         file_name = str(os.path.basename(file_path))
         file_names = [f["name"] for f in self.files_information]
 
-        if result["state"]:
+        if result["state"]: # 若文件加载成功
             self.sub_thread.signal.connect(__get_recv)
-            ftp_task = ClientFtpTask((self.ftp_host, self.ftp_port), ClientFtpTask.DOWNLOAD_FILE)
+            ftp_task = ClientFtpTask((self.ftp_host, self.ftp_port), ClientFtpTask.UPLOAD_FILE) # 创建uploadtask
             ftp_task.connect(__ftp_respond)
             if not (file_name in file_names):
-                self.sub_thread.load_sub_thread(2, request="createFile",
+                self.sub_thread.load_sub_thread(ClientSubThread.REQUEST, request="createFile",
                                                 data={"directory_id": self.current_dir_id,
                                                       "filename": file_name})
-            elif file_name in file_names:
-                file_id = self.files_information[file_names.index(file_name)]["file_id"]
-                self.sub_thread.load_sub_thread(2, request="operateFile",
-                                                data={"action": "write", "file_id": file_id})
+            elif file_name in file_names: # 若远程文件存在，覆写
+                title = ''
+                content = f"""文件{file_name}存在同名文件,是否覆盖?"""
+                w = MessageDisplay(title, content, parent=self.main_w, btn_text=("取消", "覆盖"))
+                if w.exec():
+                    info_message_display(object_name=self.main_w, information_type="info", title="已取消该操作")
+                    return
+                else:
+                    file_id = self.files_information[file_names.index(file_name)]["file_id"]
+                    self.sub_thread.load_sub_thread(ClientSubThread.REQUEST, request="operateFile",
+                                                    data={"action": "write", "file_id": file_id})
             self.sub_thread.start()
         else:
             __ftp_respond({"state": False, "error": result["error"]})

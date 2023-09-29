@@ -264,6 +264,7 @@ class ClientFtpTask(QThread):
         return {"mode": self.task_mode, "uuid": self.task_uuid, "state": self.state}
 
     def load_task(self, _task_id, _task_token, task_fileio: FtpFilesManager, file_name=None):
+        print("=============", file_name)
         self._loaded = True
         self.task_id = _task_id
         self.task_token = _task_token
@@ -281,6 +282,7 @@ class ClientFtpTask(QThread):
 
     def task_transform(self):
         try:
+            self.ftp_obj.debug(2)
             self.ftp_obj.connect(*self._ftp_address)
             self.ftp_obj.login(user=self.task_id, passwd=self.task_token)
             self.ftp_obj.prot_p()
@@ -299,6 +301,7 @@ class ClientFtpTask(QThread):
             return {"state": True}
         except ftplib.all_errors as e:
             self.state = -1
+            print(e)
             return {"state": False, "error": e}
         finally:
             self._thread_run = False
@@ -324,6 +327,7 @@ class ClientFtpTask(QThread):
             last_bytes = current_bytes
             progress = round(100 * current_bytes / file_io.file_size, 2)
             self.__ftp_progress_signal.emit((progress, speed))
+            print(speed)
 
             tar2 = tar0
             time.sleep(0.1)
