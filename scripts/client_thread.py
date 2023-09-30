@@ -53,7 +53,7 @@ class Client:
 
     def cfms_recvall(self, crypt: bool = True):
         try:
-            primary_data = [self.client.recv(1024),]
+            primary_data = [self.client.recv(1024)]
         except Exception:
             return
         

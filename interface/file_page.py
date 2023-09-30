@@ -17,14 +17,12 @@ from scripts.uie import info_message_display
 # noinspection PyTypeChecker
 class FilePage(QWidget):
     """文件管理目录"""
-
     def __init__(self, object_name):
         super().__init__(None)
-        self.setObjectName(object_name)
         self.file_information = []
+        self.setObjectName(object_name)
         self.path = [('', '<ROOT>'), ]
         self.current_path = ('', '<ROOT>')
-        self.rename_arg = False
         self.loadProgressBar = IndeterminateProgressBar(self, start=False)
 
     def setup_ui(self, functions=None):
@@ -157,10 +155,6 @@ class FilePage(QWidget):
                 delete_action.triggered.connect(lambda: self.delete_file_function(file_index=row))
                 self.list_item_menu.exec(screen_pos, ani=True)
 
-    def set_file_tree_list(self, files):
-        self.rename_arg = False
-        self.__set_files_list(files)
-
     def __set_files_tree(self, dirs):
         """文件树"""
         ...
@@ -180,12 +174,12 @@ class FilePage(QWidget):
         return item
 
     # @signal_blocker
-    def __set_files_list(self, files: list):
+    def set_files_list(self, files: list, force: bool=False):
         """设置文件列表"""
         self.table_view.blockSignals(True)
         self.loadProgressBar.stop()
         self.table_view.verticalHeader().setDefaultSectionSize(60)
-        if files == self.file_information:
+        if files == self.file_information and not force:
             self.table_view.blockSignals(False)
             return
         self.file_information = files

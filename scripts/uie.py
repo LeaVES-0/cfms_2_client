@@ -27,9 +27,10 @@ class MessageDisplay(MessageDialog):
 
 class LeaVESTitleBar(StandardTitleBar):
     """LeaVES Title Bar"""
-    def __init__(self, parent, func):
+    funcs = []
+    def __init__(self, parent, functions: list):
         super(LeaVESTitleBar, self).__init__(parent)
-        self.func = func
+        self.funcs = functions
         self.titleLabel.setStyleSheet("QLabel{ color: black}")
         spacer_item = QSpacerItem(40, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
         self.titlebarBtn = ToolButton(FluentIcon.CONSTRACT, parent=self)  # Dark Mode button
@@ -39,13 +40,15 @@ class LeaVESTitleBar(StandardTitleBar):
 
     @pyqtSlot()
     def dark_mode_btn_func(self):
-        self.func()
+        for i in self.funcs:
+            i()
 
     def set_theme(self, th: Theme=None):
         if not th:
             th = theme()
         if th == Theme.DARK:
             self.titleLabel.setStyleSheet("QLabel{ color: white}")
+            self.minBtn.setStyleSheet("{ color: white}")
         else:
             self.titleLabel.setStyleSheet("QLabel{ color: black}")
 
@@ -61,7 +64,7 @@ class CfmsUIBase(FramelessWindow):
         # 主题色
         setThemeColor(f'{DEFAULT_THEME_COLOUR}')
         # 标题栏
-        self.titleBarObj = LeaVESTitleBar(parent=self, func=self.setThemeState)
+        self.titleBarObj = LeaVESTitleBar(parent=self, functions=[self.setThemeState,])
         self.setTitleBar(self.titleBarObj)
         self.titleBarObj.raise_()
         self.setWindowTitle('cfms  2.0')

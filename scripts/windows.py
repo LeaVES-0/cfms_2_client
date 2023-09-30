@@ -129,6 +129,7 @@ class MainUI(MainWindow):
 
         # 在此处设置hBoxLayout的边距
         self.hBoxLayout.setContentsMargins(0, self.titleBar.height(), 0, 0)
+        self.titleBarObj.funcs.append(lambda: self.file_page.set_files_list(files=self.file_page.file_information, force=True))
 
     def show_file_page(self):
         self.stackWidget.setCurrentWidget(self.file_page)

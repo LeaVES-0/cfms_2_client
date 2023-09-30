@@ -320,7 +320,7 @@ class MainClient(QObject):
             if recv:
                 if recv["code"] == 0:
                     result = transform_file_dict(recv["dir_data"])
-                    self.main_w.file_page.set_file_tree_list(result)
+                    self.main_w.file_page.set_files_list(result)
 
                 elif recv["code"] == 404:
                     # 失败 设置当前目录为前一次所处目录
