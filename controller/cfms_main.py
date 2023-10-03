@@ -5,10 +5,10 @@
 # @FileName: cfms_main.py
 # coding: utf-8
 
+import hashlib
 import os
 import sys
 import time
-import hashlib
 
 from PyQt6.QtCore import *
 from PyQt6.QtWidgets import QApplication
@@ -28,7 +28,7 @@ class MainClient(QObject):
     def __init__(self):
         super().__init__(None)
         self.sub_thread = ClientSubThread()
-        self.usermanager = CfmsUserManager()
+        self.user_manager = CfmsUserManager()
         self.QtApp = QApplication(sys.argv)
         self.QtApp.setAttribute(Qt.ApplicationAttribute.AA_DontCreateNativeWidgetSiblings)
         self.login_w = LoginUI(thread=self.sub_thread)
@@ -48,9 +48,10 @@ class MainClient(QObject):
         self._force_save_user_account = False
         self.files_information = []
         self.tasks = []
+        self.current_dir_id = ''
 
         self.__login_ui_set_buttons()
-        server_items = [i[0] for i in self.usermanager.saved_servers]
+        server_items = [i[0] for i in self.user_manager.saved_servers]
         self.login_w.serverAdLE.addItems(server_items)
         self.login_w.serverAdLE.setCurrentIndex(0)
 
@@ -107,7 +108,7 @@ class MainClient(QObject):
         self.login_w.link_cancel_button.setEnabled(False)
         if state:
             self.ftp_host = server_address[0]
-            self.usermanager.remember_linked_server(address=server_address)  # 储存连接成功的服务器信息
+            self.user_manager.remember_linked_server(address=server_address)  # 储存连接成功的服务器信息
             print(f"Server state: 0. \nLink successful.")
             info_message_display(self.login_w, information_type="info", whereis="TOP_LEFT", title="连接成功!")
             if args["isFirstTimeConnection"]:
@@ -115,7 +116,7 @@ class MainClient(QObject):
                                      information="首次连接到该服务器，公钥已保存。")
             self.login_w.connectedServerLabel.setVisible(True)
             self.login_w.connectedServerLabel.setText(f"已连接到 {server_address[0]}:{server_address[1]}")
-            saved_users = self.usermanager.saved_users
+            saved_users = self.user_manager.saved_users
             last_login_password = None
             for u in saved_users[0]:
                 if u[0] == saved_users[1]:
@@ -123,7 +124,7 @@ class MainClient(QObject):
                     break
 
             def logout():
-                self.usermanager.remember_logined_user((saved_users[1], None))
+                self.user_manager.remember_logined_user((saved_users[1], None))
                 self.login_w.checkBox_remember_uer.setChecked(False)
                 self.login_w.setLoginState(1)
 
@@ -131,13 +132,13 @@ class MainClient(QObject):
                 self.login_w.show_user_name.setText(f"User: {saved_users[1]}")
                 try:
                     self.login_w.login_directly_button.clicked.disconnect()
-                except:
+                except TypeError:
                     ...
                 self.login_w.login_directly_button.clicked.connect(
                     lambda: self.user_login_function((saved_users[1], last_login_password), True))
                 try:
                     self.login_w.login_out_Button.clicked.disconnect()
-                except:
+                except TypeError:
                     ...
                 self.login_w.login_out_Button.clicked.connect(lambda: logout())
                 self._force_save_user_account = True
@@ -162,10 +163,10 @@ class MainClient(QObject):
                 self._is_cancel_link = False
         self.sub_thread.signal.disconnect(self.__check_link_state)  # 断开信号槽连接
 
-    def check_signal_recv(self, signal):
-        """检测函数执行状态码,执行成功返回服务器响应"""
+    def check_signal_recv(self, signal: dict):
+        """检测子线程执行状态码,执行成功返回服务器响应"""
         if signal["state"]:
-            return signal["recv"]
+            return signal["recv"], signal["extra"]
         else:
             error = signal["error"]
             if type(error) == ValueError:
@@ -176,7 +177,8 @@ class MainClient(QObject):
     @pyqtSlot(object, name="SOLT:check_login_state")
     def __check_login_state(self, signal: dict):
         """检测登陆状态"""
-        if (recv_from_server:=self.check_signal_recv(signal)):
+        if signal := self.check_signal_recv(signal):
+            recv_from_server, account = signal
             if recv_from_server["code"] == 0:
                 # 登录成功
                 self.login_w.login_finished = True
@@ -190,16 +192,15 @@ class MainClient(QObject):
                 self.main_w.mainUI()
                 info_message_display(self.main_w, information_type="info", whereis="TOP_RIGHT",
                                      title="登录成功!", duration_time=2000)
-
-                username = self._login_info[0]
-                hashed_password = self._login_info[1]
-                del self._login_info
-                self.sub_thread.set_auth(user=username, token=recv_from_server["token"]) # 获取到token
+                
+                username = account[0]
+                hashed_password = account[1]
+                self.sub_thread.set_auth(user=username, token=recv_from_server["token"])  # 获取到token
                 if self.login_w.checkBox_remember_uer.isChecked() or self._force_save_user_account:
                     # 是否保存密码
-                    self.usermanager.remember_logined_user((username, hashed_password))
+                    self.user_manager.remember_logined_user((username, hashed_password))
                 else:
-                    self.usermanager.remember_logined_user((username, None))
+                    self.user_manager.remember_logined_user((username, None))
                 self._force_save_user_account = False
                 self.login_w.checkBox_remember_uer.setChecked(False)
 
@@ -231,28 +232,28 @@ class MainClient(QObject):
                 self.sub_thread.signal.disconnect()  # 再次确认断开
             except TypeError:
                 ...
-            self.sub_thread.load_sub_thread(action=0, address=address)
+            self.sub_thread.load_sub_thread(action=ClientSubThread.CONNECT, address=address)
             self.sub_thread.signal.connect(self.__check_link_state)
             self.sub_thread.start()
 
-    def user_login_function(self, account: tuple, unhash: bool = False):
+    def user_login_function(self, account: tuple, n_hash: bool = False):
         """登录"""
         if not account[0] or not account[1]:
             info_message_display(self.login_w, information_type="warn", whereis="TOP_RIGHT", title="警告",
                                  information="用户名或密码不得为空")
         else:
-            print('Logining......')
+            print('Loginning......')
             self.login_w.loadProgressBar.start()  # 禁用按键,开启进度条
             self.login_w.login_Button.setEnabled(False)
             self.login_w.back_Button.setEnabled(False)
             password = account[1]
-            if not unhash:
+            if not n_hash:
                 sha256_obj = hashlib.sha256()
                 sha256_obj.update(password.encode())
                 password = sha256_obj.hexdigest()
             self.sub_thread.load_sub_thread(action=ClientSubThread.REQUEST, request="login",
-                                            data={"username": f'{account[0]}', "password": f'{password}'})
-            self._login_info = (account[0], password)
+                                            data={"username": f'{account[0]}', "password": f'{password}'},
+                                            extra=(account[0], password))
             self.sub_thread.signal.connect(self.__check_login_state)
             self.sub_thread.start()
 
@@ -313,10 +314,10 @@ class MainClient(QObject):
                 i["parent_id"] = parent_dir_id
             return self.files_information
 
-        @pyqtSlot(object)
-        def get_recv(signal):
-            self.sub_thread.signal.disconnect(get_recv)
-            recv = self.check_signal_recv(signal)
+        @pyqtSlot(object, name="get_dir_function__get_recv")
+        def __get_recv(signal):
+            self.sub_thread.signal.disconnect(__get_recv)
+            recv = self.check_signal_recv(signal)[0]
             if recv:
                 if recv["code"] == 0:
                     result = transform_file_dict(recv["dir_data"])
@@ -331,12 +332,13 @@ class MainClient(QObject):
                 else:
                     info_message_display(self.main_w, information_type="error", whereis="TOP_LEFT", title="未知错误")
 
-        self.sub_thread.signal.connect(get_recv)
+        self.sub_thread.signal.connect(__get_recv)
         if not dir_id:
             self.sub_thread.load_sub_thread(ClientSubThread.REQUEST, request="getRootDir")
             self.sub_thread.start()
         else:
-            self.sub_thread.load_sub_thread(ClientSubThread.REQUEST, request="operateDir", data={"action": "list", "dir_id": dir_id})
+            self.sub_thread.load_sub_thread(ClientSubThread.REQUEST, request="operateDir",
+                                            data={"action": "list", "dir_id": dir_id})
             self.sub_thread.start()
 
     # file_index 是文件在self.files_information中的索引
@@ -347,17 +349,17 @@ class MainClient(QObject):
         except TypeError:
             ...
 
-        @pyqtSlot(object)
+        @pyqtSlot(object, name="create_new_dir_function__get_recv")
         def __get_recv(signal):
             self.sub_thread.signal.disconnect(__get_recv)
-            recv = self.check_signal_recv(signal)
+            recv = self.check_signal_recv(signal)[0]
             if recv:
                 self.get_dir_function(self.current_dir_id)
 
         if not data:
             data = "New Folder " + time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time.time()))
         self.sub_thread.load_sub_thread(ClientSubThread.REQUEST, request="createDir",
-                                         data={"parent_id": self.current_dir_id, "name": data})
+                                        data={"parent_id": self.current_dir_id, "name": data})
         self.sub_thread.signal.connect(__get_recv)
         self.sub_thread.start()
 
@@ -371,9 +373,10 @@ class MainClient(QObject):
 
         def __get_recv(signal):
             self.sub_thread.signal.disconnect(__get_recv)
-            recv = self.check_signal_recv(signal)
+            recv = self.check_signal_recv(signal)[0]
             if recv:
                 ...
+
         if obj_type == "dir":
             self.sub_thread.load_sub_thread(ClientSubThread.REQUEST, request="operateDir",
                                             data={"dir_id": file_id, "action": 'rename', 'new_dirname': data})
@@ -391,10 +394,10 @@ class MainClient(QObject):
         obj_type = self.files_information[file_index]["type"]
         file_id = self.files_information[file_index]["file_id"]
 
-        @pyqtSlot(object)
+        @pyqtSlot(dict, name="delete_file_function__get_recv")
         def __get_recv(signal):
             self.sub_thread.signal.disconnect(__get_recv)
-            recv = self.check_signal_recv(signal)
+            recv = self.check_signal_recv(signal)[0]
             if recv:
                 self.get_dir_function(self.current_dir_id)
 
@@ -416,9 +419,9 @@ class MainClient(QObject):
         ftp_file_io = FtpFilesManager()
         file_name = str(file['name'])
         file_size = int(file['primary_size'])
-        result = ftp_file_io.load_file(FtpFilesManager.WRITE, file_name, file_size) # 载入文件
+        result = ftp_file_io.load_file(FtpFilesManager.WRITE, file_name, file_size)  # 载入文件
 
-        @pyqtSlot(object)
+        @pyqtSlot(object, name="download_file_function__ftp_respond")
         def __ftp_respond(signal):  # 结果处理
             if not signal['state']:
                 if signal["error"] == "FEE":
@@ -426,10 +429,10 @@ class MainClient(QObject):
                 else:
                     info_message_display(self.main_w, title="未知错误", information=str(signal["error"]))
 
-        @pyqtSlot(object)
+        @pyqtSlot(dict, name="download_file_function__get_recv")
         def __get_recv(signal):
             self.sub_thread.signal.disconnect(__get_recv)
-            recv = self.check_signal_recv(signal)
+            recv = self.check_signal_recv(signal)[0]
             if recv:
                 if recv["code"] == 0:
                     # task
@@ -442,7 +445,7 @@ class MainClient(QObject):
 
         # send request
         if result["state"]:
-            ftp_task = ClientFtpTask((self.ftp_host, self.ftp_port), ClientFtpTask.DOWNLOAD_FILE) # 创建task
+            ftp_task = ClientFtpTask((self.ftp_host, self.ftp_port), ClientFtpTask.DOWNLOAD_FILE)  # 创建task
             ftp_task.connect(__ftp_respond)
             self.sub_thread.load_sub_thread(2, request="operateFile",
                                             data={"action": "read", "file_id": file['file_id']})
@@ -462,18 +465,18 @@ class MainClient(QObject):
             pass
         ftp_file_io = FtpFilesManager()
         file_size = int(os.path.getsize(file_path))
-        result = ftp_file_io.load_file(FtpFilesManager.READ, file_path, file_size) # 载入要上传的文件
+        result = ftp_file_io.load_file(FtpFilesManager.READ, file_path, file_size)  # 载入要上传的文件
 
-        @pyqtSlot(object)
+        @pyqtSlot(object, name="upload_file_function__ftp_respond")
         def __ftp_respond(signal):
             if not signal['state']:
                 info_message_display(self.main_w, title="错误", information=str(signal["error"]))
             self.get_dir_function(self.current_dir_id)
 
-        @pyqtSlot(object)
+        @pyqtSlot(object, name="upload_file_function__get_recv")
         def __get_recv(signal):
             self.sub_thread.signal.disconnect(__get_recv)
-            recv = self.check_signal_recv(signal)
+            recv = self.check_signal_recv(signal)[0]
             if recv:
                 if recv['code'] == 0:
                     task_id = recv["data"]["task_id"]
@@ -488,16 +491,16 @@ class MainClient(QObject):
         file_name = str(os.path.basename(file_path))
         file_names = [f["name"] for f in self.files_information]
 
-        if result["state"]: # 若文件加载成功
+        if result["state"]:  # 若文件加载成功
             self.sub_thread.signal.connect(__get_recv)
-            ftp_task = ClientFtpTask((self.ftp_host, self.ftp_port), ClientFtpTask.UPLOAD_FILE) # 创建uploadtask
+            ftp_task = ClientFtpTask((self.ftp_host, self.ftp_port), ClientFtpTask.UPLOAD_FILE)  # 创建upload_task
             ftp_task.connect(__ftp_respond)
             if not (file_name in file_names):
                 self.sub_thread.load_sub_thread(ClientSubThread.REQUEST, request="createFile",
                                                 data={"directory_id": self.current_dir_id,
                                                       "filename": file_name})
-            elif file_name in file_names: # 若远程文件存在，覆写
-                title = ''
+            elif file_name in file_names:  # 若远程文件存在，覆写
+                title = 'Confirm'
                 content = f"""文件{file_name}存在同名文件,是否覆盖?"""
                 w = MessageDisplay(title, content, parent=self.main_w, btn_text=("取消", "覆盖"))
                 if w.exec():

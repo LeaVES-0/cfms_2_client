@@ -11,7 +11,7 @@ from PyQt6.QtWidgets import *
 from qfluentwidgets import *
 
 from scripts.method import FILE_TYPES
-from scripts.uie import info_message_display
+from scripts.uie import info_message_display, MessageDisplay
 
 
 # noinspection PyTypeChecker
@@ -116,7 +116,7 @@ class FilePage(QWidget):
         self.table_view.setContentsMargins(10, 100, 0, 0)
         self.table_view.setColumnCount(5)
         self.table_view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        self.table_view.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        self.table_view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         self.verticalLayout_2.addWidget(self.table_view, 5)
 
         # 在全局布局里嵌套布局
@@ -194,7 +194,8 @@ class FilePage(QWidget):
             self.table_view.setColumnCount(5)
             self.table_view.setRowCount(len(files))
             self.table_view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-            self.table_view.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+            self.table_view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+            
             self.table_view.setHorizontalHeaderLabels(['Name', 'Date created', 'Type', 'Size', 'Permission'])
             for row, file_info in enumerate(self.file_information):
                 for column in range(5):
@@ -231,13 +232,31 @@ class FilePage(QWidget):
         """rename"""
         self.table_view.blockSignals(True)
         data = str(self.table_view.item(row, column).text())
-        self.file_information[row]["name"] = data
-        self.file_rename_function(data=data, file_index=row)
-        if self.file_information[row]["type"] == "file":
-            _type = os.path.splitext(data)[-1].strip(".").lower()
-            file_type = self.file_information[row]["specific_type"] = FILE_TYPES.get(_type, _type.upper() + " File")
-            self.table_view.item(row, 2).setText(file_type)
-        self.table_view.blockSignals(False)
+        if data in [f["name"] for f in self.file_information]:
+            title = 'ERROR'
+            content = f"""此目标已包含名为{data}的文件"""
+            w = MessageDisplay(title, content, parent=self, btn_text=("取消",))
+            w.exec()
+            self.table_view.item(row, column).setText(self.file_information[row]["name"])
+            info_message_display(object_name=self, information_type="info", title="已取消该操作")
+            self.table_view.blockSignals(False)
+            return
+        elif data.isspace() or not data:
+            title = 'ERROR'
+            content = f"""文件名不得为空"""
+            w = MessageDisplay(title, content, parent=self, btn_text=("取消",))
+            w.exec()
+            self.table_view.item(row, column).setText(self.file_information[row]["name"])
+            info_message_display(object_name=self, information_type="info", title="已取消该操作")
+            self.table_view.blockSignals(False)
+        else:
+            self.file_information[row]["name"] = data
+            self.file_rename_function(data=data, file_index=row)
+            if self.file_information[row]["type"] == "file":
+                _type = os.path.splitext(data)[-1].strip(".").lower()
+                file_type = self.file_information[row]["specific_type"] = FILE_TYPES.get(_type, _type.upper() + " File")
+                self.table_view.item(row, 2).setText(file_type)
+            self.table_view.blockSignals(False)
 
     def create_new_file_action(self, file_type: str = "folder"):
         """新建文件夹"""

@@ -197,10 +197,6 @@ class ClientSubThread(QThread, Client):
     CONNECT = 0
 
     def __init__(self):
-        """action
-        0:link server
-        1:login
-        2:send message"""
         super(ClientSubThread, self).__init__()
         self.sub_thread_args = None
         self.sub_thread_action = None
@@ -223,6 +219,7 @@ class ClientSubThread(QThread, Client):
             elif self.sub_thread_action == 2:
                 data_2 = self._cfms_send_request(request=self.sub_thread_kwargs["request"],
                                                  data=self.sub_thread_kwargs.setdefault("data", {}))
+                data_2["extra"] = self.sub_thread_kwargs.get("extra", None)
                 self.signal.emit(data_2)
 
             elif self.sub_thread_action == 3:
@@ -264,7 +261,6 @@ class ClientFtpTask(QThread):
         return {"mode": self.task_mode, "uuid": self.task_uuid, "state": self.state}
 
     def load_task(self, _task_id, _task_token, task_fileio: FtpFilesManager, file_name=None):
-        print("=============", file_name)
         self._loaded = True
         self.task_id = _task_id
         self.task_token = _task_token

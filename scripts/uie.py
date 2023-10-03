@@ -95,6 +95,9 @@ class CfmsUIBase(FramelessWindow):
         if title_text:
             self.setWindowTitle(self.windowTitle + "   " + title_text)
 
+    def setThemeColour(c: str):
+        setThemeColor(c)
+
     def setThemeState(self, th=None):
         """切换主题模式"""
         opposing = {Theme.DARK:Theme.LIGHT, Theme.LIGHT:Theme.DARK}
