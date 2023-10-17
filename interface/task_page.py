@@ -8,68 +8,21 @@ from PyQt6.QtCore import *
 from PyQt6.QtWidgets import *
 from qfluentwidgets import *
 
+class TaskBarObj(QWidget):
+    ...
 
 class TaskTabelView(QWidget):
     def __init__(self, obj_name):
         super().__init__()
         self.task_information = []
         self.main_layout = QVBoxLayout(self)
-        self.table_view = TableWidget()  # 创建表格
-        self.table_view.setWordWrap(True)
-        self.table_view.clear()
-        self.table_view.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        self.table_view.horizontalHeader().hide()
-        self.table_view.verticalHeader().hide()
-        self.table_view.verticalHeader().setDefaultSectionSize(60)
-        self.table_view.setContentsMargins(10, 100, 0, 0)
-        self.table_view.setColumnCount(2)
-        self.table_view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+
         self.setObjectName(obj_name)
-        self.main_layout.addWidget(self.table_view)
+    
+    def addTaskObj(self):
+        task_obj = TaskBarObj()
+        self.main_layout.addWidget()
 
-        self.table_view.customContextMenuRequested.connect(self.file_list_button)
-        # self.table_view.cellDoubleClicked.connect()
-        # self.table_view.cellChanged.connect()
-
-    def file_list_button(self, pos):
-        """文件右键"""
-        row = 0
-        for i in self.table_view.selectionModel().selection().indexes():
-            row = i.row()
-
-    @staticmethod
-    def __create_list_item(info, obj_type: str = "download"):
-        """设置单元格"""
-        item = QTableWidgetItem(info)
-        item.setFlags(Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled)
-        if obj_type == "download":
-            item.setIcon(FluentIcon.DOWNLOAD.icon())
-        elif obj_type == "upload":
-            item.setIcon(FluentIcon.UPDATE.icon())
-        return item
-
-    def __set_tasks_list(self, tasks: list):
-        """设置文件列表"""
-        self.table_view.blockSignals(True)
-        self.table_view.clear()
-        self.table_view.setRowCount(len(tasks))
-        if self.task_information == tasks:
-            self.table_view.blockSignals(False)
-            return
-        self.task_information = tasks
-        # 批量设置表格项
-        if not tasks:
-            self.table_view.setColumnCount(1)
-            self.table_view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-            self.table_view.setHorizontalHeaderLabels(["No Task"])  # 行标题
-        elif tasks:
-            self.table_view.setColumnCount(2)
-            self.table_view.verticalHeader().setDefaultSectionSize(60)
-            self.table_view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-            for row, file_info in enumerate(self.task_information):
-                for column in range(0, 3):
-                    self.table_view.setItem(row, column, self.__create_list_item(column))
-        self.table_view.blockSignals(False)
 
 
 class TaskPage(QWidget):

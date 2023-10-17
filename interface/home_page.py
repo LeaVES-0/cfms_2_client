@@ -6,6 +6,8 @@
 # coding: utf-8
 
 from PyQt6.QtWidgets import *
+from scripts.uie import CardView
+from qfluentwidgets import FluentIcon
 
 
 class HomePage(QWidget):
@@ -16,9 +18,9 @@ class HomePage(QWidget):
     def setup_ui(self, args=None):
         self.verticalLayoutWidget = QWidget(parent=self)
         self.verticalLayoutWidget.setObjectName("verticalLayoutWidget")
-        self.verticalLayout = QVBoxLayout(self.verticalLayoutWidget)
-        self.verticalLayout.setContentsMargins(0, 0, 0, 0)
-        self.verticalLayout.setObjectName("verticalLayout")
+        self.main_layout = QVBoxLayout(self.verticalLayoutWidget)
+        self.main_layout.setContentsMargins(0, 0, 0, 0)
+        self.main_layout.setObjectName("verticalLayout")
         self.titleLabel = QLabel()
         self.titleLabel.setText("CFMS  2")
         self.titleLabel.setStyleSheet(
@@ -27,7 +29,7 @@ class HomePage(QWidget):
             }"""
         )
         self.titleLabel.setContentsMargins(30, 20, 0, 0)
-        self.verticalLayout.addWidget(self.titleLabel)
+        self.main_layout.addWidget(self.titleLabel)
         self.titleLabel_s = QLabel()
         self.titleLabel_s.setText("Classified File Management System")
         self.titleLabel_s.setStyleSheet(
@@ -36,4 +38,29 @@ class HomePage(QWidget):
             }"""
         )
         self.titleLabel_s.setContentsMargins(30, 0, 0, 0)
-        self.verticalLayout.addWidget(self.titleLabel_s)
+        self.main_layout.addWidget(self.titleLabel_s)
+
+        self.CardView = CardView(self)
+
+        self.main_layout.addWidget(self.CardView)
+
+        self.CardView.addCard(
+            FluentIcon.GITHUB,
+            self.tr('GitHub (Server)'),
+            self.tr('在Github获取服务端最新版本'),
+            "https://github.com/Creeper19472/cfms_2"
+        )
+
+        self.CardView.addCard(
+            FluentIcon.GITHUB,
+            self.tr('GitHub (Client)'),
+            self.tr('在Github获取客户端最新版本'),
+            "https://github.com/LeaVES-0/cfms_2_client"
+        )
+
+        self.CardView.addCard(
+            FluentIcon.CODE,
+            self.tr('Code'),
+            self.tr('开发指南'),
+            "https://cfms-server-doc.readthedocs.io/zh_CN/latest"
+        )

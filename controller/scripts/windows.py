@@ -13,7 +13,7 @@ from qfluentwidgets import *
 from interface.login_window import LoginWindow
 from interface.main_window import MainWindow
 
-RESOURCE_IMAGES = "resource/images/"
+RESOURCE_IMAGES = "interface/resource/images/"
 
 
 class LoginUI(LoginWindow):
