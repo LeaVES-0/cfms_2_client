@@ -14,6 +14,7 @@ from interface.login_window import LoginWindow
 from interface.main_window import MainWindow
 
 RESOURCE_IMAGES = "resource/images/"
+OPPOSING_THEME = {Theme.DARK:Theme.LIGHT, Theme.LIGHT:Theme.DARK}
 
 
 class LoginUI(LoginWindow):
@@ -26,10 +27,10 @@ class LoginUI(LoginWindow):
         self.label.setPixmap(QPixmap(f"{RESOURCE_IMAGES}login_b.jpg"))
         self.label_head_icon.setPixmap(QPixmap(f"{RESOURCE_IMAGES}logo.png"))
         self.titleBar.hBoxLayout.removeWidget(self.titleBar.maxBtn)
-        # self.setFixedSize(self.width(), self.height())
-        self.setLoginState(0)
+        self.setFixedSize(self.width(), self.height())
+        self.setLoginPage(0)
 
-    def set_widget_theme(self, interface_theme: Theme):
+    def set_widget_theme(self, interface_theme: Theme = None):
         if interface_theme == Theme.DARK:
             interface_style_sheet = "background-color: #333333;"
             label_style = """QLabel{
@@ -53,7 +54,7 @@ class LoginUI(LoginWindow):
                 item.widget().setVisible(value)
         self.titleBarObj.raise_()
 
-    def setLoginState(self, state: int = 0):
+    def setLoginPage(self, state: int = 0):
         """为0时显示服务器连接界面,为1时显示用户登陆界面."""
         if state == 0:
             self.label_title.setText("Link Server")
@@ -72,6 +73,16 @@ class LoginUI(LoginWindow):
             self.set_layout_visible(self.QVBoxLayout_3, True)
         else:
             raise TypeError
+
+    def setLinkState(self, isLinking:bool):
+        if not isLinking:
+            self.loadProgressBar.stop()
+            self.link_server_button.setEnabled(True)
+            self.link_cancel_button.setEnabled(False)
+        else:
+            self.loadProgressBar.start()
+            self.link_server_button.setEnabled(False)
+            self.link_cancel_button.setEnabled(True)
 
     def getServerAddress(self):
         hostname = self.serverAdLE.text().strip()
