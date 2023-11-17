@@ -1,10 +1,14 @@
 # -*- coding: utf-8 -*-
 # @Time    : 30/7/2023 下午9:43
 # @Author  : LeaVES
-# @FileName: method.py
+# @FileName: cfms_common.py
 # coding: utf-8
 
 from qfluentwidgets import *
+
+def do_nothing(*args, **kwargs):
+    print("called")
+    ...
 
 FILE_TYPES = {"txt": "Text document",
               "rar": "Roshal Archive ",

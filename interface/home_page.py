@@ -6,16 +6,27 @@
 # coding: utf-8
 
 from PyQt6.QtWidgets import *
-from scripts.uie import CardView
+from util.uie.elements import CardView
 from qfluentwidgets import FluentIcon
 
 
 class HomePage(QWidget):
-    def __init__(self, object_name):
+    def __init__(self, *args, **kwargs):
         super().__init__(None)
-        self.setObjectName(object_name)
+        try:
+            self.functions = kwargs["functions"]
+        except KeyError:
+            self.functions = {}
 
-    def setup_ui(self, args=None):
+        self.setObjectName(kwargs["name"])
+
+    def connect_signal_solt(self, functions: dict):
+        self.functions.update(functions)
+
+    def setup_ui(self, *args, **kwargs):
+
+        self.connect_signal_solt(self.functions)
+
         self.verticalLayoutWidget = QWidget(parent=self)
         self.verticalLayoutWidget.setObjectName("verticalLayoutWidget")
         self.main_layout = QVBoxLayout(self.verticalLayoutWidget)
@@ -41,6 +52,7 @@ class HomePage(QWidget):
         self.main_layout.addWidget(self.titleLabel_s)
 
         self.CardView = CardView(self)
+        self.CardView.setContentsMargins(0,0,0,0)
 
         self.main_layout.addWidget(self.CardView)
 

@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # @Time    : 18/6/2023 下午2:12
 # @Author  : LeaVES
-# @FileName: windows.py
+# @FileName: cfms_ui.py
 # coding: utf-8
 import threading
 
@@ -12,13 +12,15 @@ from PyQt6.QtWidgets import *
 from qfluentwidgets import *
 from interface.login_window import LoginWindow
 from interface.main_window import MainWindow
+from util.cfms_common import *
 
 RESOURCE_IMAGES = "resource/images/"
-OPPOSING_THEME = {Theme.DARK:Theme.LIGHT, Theme.LIGHT:Theme.DARK}
+OPPOSING_THEME = {Theme.DARK: Theme.LIGHT, Theme.LIGHT: Theme.DARK}
 
 
 class LoginUI(LoginWindow):
     login_finished = False
+
     def __init__(self, *args, **kwargs):
         super().__init__(parent=self)
         self.set_widget_theme(theme())
@@ -30,68 +32,51 @@ class LoginUI(LoginWindow):
         self.setFixedSize(self.width(), self.height())
         self.setLoginPage(0)
 
-    def set_widget_theme(self, interface_theme: Theme = None):
-        if interface_theme == Theme.DARK:
-            interface_style_sheet = "background-color: #333333;"
-            label_style = """QLabel{
-            font: 'Microsoft YaHei';
-            font-weight: bold;
-            color: white
-            }"""
-        else:
-            interface_style_sheet = "background-color: white;"
-            label_style = """QLabel{
-            font: 'Microsoft YaHei';
-            color: black
-            }"""
-        self.setStyleSheet(interface_style_sheet)
-        self.widget.setStyleSheet(label_style)
-
-    def set_layout_visible(self, q_layout, value: bool = True):
-        for i in range(q_layout.count()):
-            if not isinstance(q_layout.itemAt(i), QSpacerItem):
-                item = q_layout.itemAt(i)
-                item.widget().setVisible(value)
-        self.titleBarObj.raise_()
-
     def setLoginPage(self, state: int = 0):
         """为0时显示服务器连接界面,为1时显示用户登陆界面."""
         if state == 0:
             self.label_title.setText("Link Server")
-            self.set_layout_visible(self.QVBoxLayout_2, False)
-            self.set_layout_visible(self.GridLayoutFServer, True)
-            self.set_layout_visible(self.QVBoxLayout_3, False)
+            self.stackWidget.setCurrentWidget(self.server_info_bar)
         elif state == 1:
             self.label_title.setText("Login")
-            self.set_layout_visible(self.QVBoxLayout_2, True)
-            self.set_layout_visible(self.GridLayoutFServer, False)
-            self.set_layout_visible(self.QVBoxLayout_3, False)
+            self.user_info_bar.stackWidget.setCurrentWidget(self.user_info_bar.page00)
+            self.stackWidget.setCurrentWidget(self.user_info_bar)
         elif state == 2:
             self.label_title.setText("Login")
-            self.set_layout_visible(self.QVBoxLayout_2, False)
-            self.set_layout_visible(self.GridLayoutFServer, False)
-            self.set_layout_visible(self.QVBoxLayout_3, True)
+            self.user_info_bar.stackWidget.setCurrentWidget(self.user_info_bar.page01)
+            self.stackWidget.setCurrentWidget(self.user_info_bar)
         else:
             raise TypeError
 
-    def setLinkState(self, isLinking:bool):
-        if not isLinking:
+    def setLoadingState(self, isLoading: bool):
+        """
+        设置登陆界面的UI加载状态
+        为假时停止加载条
+        """
+        if not isLoading:
             self.loadProgressBar.stop()
-            self.link_server_button.setEnabled(True)
-            self.link_cancel_button.setEnabled(False)
+            self.server_info_bar.link_server_button.setEnabled(True)
+            self.server_info_bar.link_cancel_button.setEnabled(False)
+            self.user_info_bar.back_Button.setEnabled(True)
+            self.user_info_bar.login_Button.setEnabled(True)
+            self.user_info_bar.page01.login_out_Button.setEnabled(True)
         else:
             self.loadProgressBar.start()
-            self.link_server_button.setEnabled(False)
-            self.link_cancel_button.setEnabled(True)
+            self.server_info_bar.link_server_button.setEnabled(False)
+            self.server_info_bar.link_cancel_button.setEnabled(True)
+            self.user_info_bar.back_Button.setEnabled(False)
+            self.user_info_bar.login_Button.setEnabled(False)
+            self.user_info_bar.page01.login_out_Button.setEnabled(False)
 
     def getServerAddress(self):
-        hostname = self.serverAdLE.text().strip()
-        port = self.serverPortLE.text().strip()
+        ...
+        hostname = self.server_info_bar.serverAdLE.text().strip()
+        port = self.server_info_bar.serverPortLE.text().strip()
         return hostname, port
 
     def getUserAccount(self):
-        username = self.userNameLE.text().strip()
-        password = self.userPasswordLE.text().strip()
+        username = self.user_info_bar.page00.userNameLE.text().strip()
+        password = self.user_info_bar.page00.userPasswordLE.text().strip()
         return username, password
 
     def resizeEvent(self, e):
@@ -110,10 +95,28 @@ class LoginUI(LoginWindow):
             self.client_thread.close_connection()
         event.accept()
 
+    def actions_connector(self, action_name: str = "", func=None, disconnect: bool = False):
+        reflection = {
+            "back": self.user_info_bar.back_Button,
+            "cancel": self.server_info_bar.link_cancel_button,
+            "link": self.server_info_bar.link_server_button,
+            "login": self.user_info_bar.login_Button,
+            "logout": self.user_info_bar.page01.login_out_Button,
+            "show_connected_server_info": self.user_info_bar.connected_server_info,
+        }
+        if disconnect:
+            try:
+                reflection[action_name].disconnect()
+            except TypeError:
+                pass
+            return
+
+        reflection[action_name].clicked.connect(func)
+        return
+
     def loginUI(self):
         self.show()
-        _timer = threading.Timer(1, self.splashScreen.finish)
-        _timer.start()
+        self.splashScreen.finish()
 
 
 class MainUI(MainWindow):
@@ -123,14 +126,18 @@ class MainUI(MainWindow):
 
         # widgets theme
         self.client_thread = kwargs["thread"]
-        self.home_page.setup_ui()
-        self.file_page.setup_ui(kwargs["functions"])
-        self.task_page.setup_ui(kwargs["functions"])
-        self.get_files_function = kwargs["functions"]["get_files_function"]
+        try:
+            self.functions = kwargs["functions"]
+        except KeyError:
+            self.functions = {}
+        for p in self.pages:
+            p.setup_ui(self.functions, functions=self.functions)
+
+        self.get_files_function = self.functions.get(self.GET_FILES, do_nothing)
         # 在导航栏添加组件
         self.addSubInterface(self.home_page, FluentIcon.HOME_FILL,
                              lambda: self.stackWidget.setCurrentWidget(self.home_page), "Home")
-        
+
         self.navigationInterface.addSeparator()
 
         self.addSubInterface(self.file_page, FluentIcon.FOLDER, self.show_file_page, "Files")
@@ -140,36 +147,29 @@ class MainUI(MainWindow):
 
         # 在此处设置hBoxLayout的边距
         self.hBoxLayout.setContentsMargins(0, self.titleBar.height(), 0, 0)
-        self.titleBarObj.funcs.append(lambda: self.file_page.set_files_list(files=self.file_page.file_information, force=True))
+        self.titleBarObj.funcs.append(
+            lambda: self.file_page.set_files_list(files=self.file_page.file_information, force=True))
 
     def show_file_page(self):
         self.stackWidget.setCurrentWidget(self.file_page)
         self.get_files_function(self.file_page.current_path[0])
 
-    def set_widget_theme(self, interface_theme: Theme):
-        if interface_theme == Theme.DARK:
-            interface_style_sheet = "background-color: #333333;"
-            label_style = """QLabel{
-            font: 13px 'Microsoft YaHei';
-            font-weight: bold;
-            background-color:transparent;
-            color: white
-            }"""
-        else:
-            interface_style_sheet = "background-color: white;"
-            label_style = """QLabel{
-            font: 13px 'Microsoft YaHei';
-            background-color: transparent;
-            color: black
-            }"""
-        self.setStyleSheet(interface_style_sheet)
-        self.stackWidget.setStyleSheet(label_style)
-
     def closeEvent(self, event):
         self.client_thread.close_connection()
         event.accept()
 
+    def actions_connector(self, action_name: str = "", func=None, disconnect: bool = False):
+        if disconnect:
+            del self.functions[action_name]
+            return
+
+        self.functions[action_name] = func
+
+        for p in self.pages:
+            p.connect_signal_solt(self.functions)
+
+        self.get_files_function = self.functions.get(self.GET_FILES, lambda: ...)
+
     def mainUI(self):
         self.show()
-        _timer = threading.Timer(1, self.splashScreen.finish)
-        _timer.start()
+        self.splashScreen.finish()

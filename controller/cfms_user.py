@@ -5,7 +5,7 @@
 # @FileName: cfms_user.py
 # coding: utf-8
 
-from scripts.fileio import ClientDataFile
+from util.cfms_fileIO import ClientDataFile
 
 
 class CfmsUserManager:

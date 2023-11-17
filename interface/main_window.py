@@ -8,30 +8,36 @@ from PyQt6.QtCore import QMetaObject
 from PyQt6.QtWidgets import *
 from qfluentwidgets import NavigationInterface, NavigationItemPosition
 
-from scripts.uie import CfmsUIBase
+from util.uie.base import CfmsUIBase
 from interface.file_page import FilePage
 from interface.home_page import HomePage
 from interface.task_page import TaskPage
 
 
 class MainWindow(CfmsUIBase):
+    GET_FILES = "get_files_function"
+    RENAME_FILE = "rename_file_function"
+    DOWNLOAD_FILE = "download_file_function"
+    DELETE_FILE = "delete_file_function"
+    UPLOAD_FILE = "upload_file_function"
+    CREATE_NEW_FOLDER = "create_new_dir_function"
+
     def __init__(self, *args, **kwargs):
         """主窗口"""
         super().__init__()
         QMetaObject.connectSlotsByName(self)
+        self.setObjectName("CFMS_Main_Window")
         # 创建导航栏组件
         self.navigationInterface = NavigationInterface(self, showMenuButton=True)
-        self.home_page = HomePage("home")
-        self.file_page = FilePage("file")
-        self.task_page = TaskPage("task")
+        self.home_page = HomePage(name="home")
+        self.file_page = FilePage(name="file")
+        self.task_page = TaskPage(name="task")
+        self.pages = [self.home_page, self.file_page, self.task_page]
         self.setup_ui()
 
     def setup_ui(self):
         self.hBoxLayout = QHBoxLayout(self)
         self.stackWidget = QStackedWidget(self)
-        self.stackWidget.setStyleSheet("""QLabel{
-            font: 13px 'Microsoft YaHei'
-            }""")
         # 将导航栏目添加到hBoxLayout
         self.hBoxLayout.setSpacing(0)
         self.hBoxLayout.addWidget(self.navigationInterface)

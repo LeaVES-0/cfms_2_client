@@ -28,12 +28,22 @@ class TaskTabelView(QWidget):
 class TaskPage(QWidget):
     """任务管理目录"""
 
-    def __init__(self, object_name):
+    def __init__(self, *args, **kwargs):
         super().__init__(None)
-        self.setObjectName(object_name)
+        try:
+            self.functions = kwargs["functions"]
+        except KeyError:
+            self.functions = {}
+        self.setObjectName(kwargs["name"])
 
-    def setup_ui(self, functions=None):
+    def connect_signal_solt(self, functions: dict):
+        self.functions.update(functions)
+
+    def setup_ui(self, *args, **kwargs):
         super().__init__(self)
+
+        self.connect_signal_solt(self.functions)
+
         size_policy = QSizePolicy()
         size_policy.Policy(QSizePolicy.Policy.Preferred)
         size_policy.setHorizontalStretch(0)

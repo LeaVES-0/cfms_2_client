@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # @Time    : 3/7/2023 下午12:32
 # @Author  : LeaVES
-# @FileName: client_thread.py
+# @FileName: cfms_network.py
 # coding: utf-8
 import ftplib
 import json
@@ -20,7 +20,7 @@ from Crypto.Random import get_random_bytes
 from Crypto.Util.Padding import pad, unpad
 from PyQt6.QtCore import *
 
-from scripts.fileio import ClientPemFile, FtpFilesManager
+from util.cfms_fileIO import ClientPemFile, FtpFilesManager
 
 DEFAULT_PORT = 5103
 
@@ -29,18 +29,18 @@ class CfmsClientSocket:
     ftplib.FTP_TLS.ssl_version = ssl.PROTOCOL_TLSv1_2
     socket.setdefaulttimeout(15)
 
-    def __init__(self, logger: logging.Logger=None):
-        self._is_linked = False  # 内部连接状态特性
+    def __init__(self, logger: logging.Logger = None):
+        self.is_linked = False  # 内部连接状态特性
         self.AEC_key = None
         self.pem_file = None
         self._server_response = None
         self.cfms_dict_to_send = {"version": 1, "request": "", "data": {}}
-        self.client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        # self.client.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, True)
-        self.client.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, True)
+        self.main_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.main_sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, True)
+        self.main_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, True)
         self.logger = logger
         self.logging(logger)
-        self.client.setblocking(False)
+        self.main_sock.setblocking(False)
 
         self.requests = []
         self.responses = []
@@ -52,14 +52,14 @@ class CfmsClientSocket:
                                 format='%(asctime)s - %(name)s - %(levelname)s - %(message)s-%(funcName)s',
                                 level=logging.DEBUG)
 
-    def cfms_AES_encrypt(self, data):
+    def cfms_aes_encrypt(self, data):
         """AES加密"""
         aes_cipher = AES.new(self.AEC_key, AES.MODE_CBC)  # 生成对称加密密钥对象CBC
         encrypted_data = aes_cipher.encrypt(pad(data.encode(), AES.block_size))
         iv = aes_cipher.iv
         return iv + encrypted_data
 
-    def cfms_AES_decrypt(self, data):
+    def cfms_aes_decrypt(self, data):
         """AES解密"""
         iv = data[:16]
         aes_cipher = AES.new(self.AEC_key, AES.MODE_CBC, iv=iv)  # 生成对称加密密钥对象CBC
@@ -67,59 +67,68 @@ class CfmsClientSocket:
         return decrypted_data.decode()
 
     def cfms_recvall(self, crypt: bool = True):
-        self.client.setblocking(False)
+        """
+        接收来自cfms服务器的数据并自动解密,
+        crypt 为假时不解密。
+        此函数自带1ms阻塞"""
         primary_data = []
-        # try:
-        #     primary_data = [self.client.recv(1024)]
-        # except Exception:
-        #     return
-        
-        # if primary_data[0] in (0,-1):  # 返回0,-1代表出错
-        #     return
+        try:
+            self.main_sock.setblocking(True)
+            self.main_sock.settimeout(0.001)
+            primary_data.append(self.main_sock.recv(1024))
+        except TimeoutError:
+            return None
+        except OSError as e:
+            if e.errno == 10038:
+                return None
+            else:
+                raise e
+
+        if primary_data[0] in (0,-1):  # 返回0,-1代表出错
+            return None
+
+        self.main_sock.setblocking(False)
         # if not bool(primary_data[0]):
         #     return
-        # self.client.setblocking(False)
-        while True:
+        while primary_data:
             try:
-                more = self.client.recv(1024)
+                more = self.main_sock.recv(1024)
                 primary_data.append(more)
             except BlockingIOError:
                 break
-        # self.client.setblocking(True)
         primary_data = b"".join(primary_data)
         if primary_data:
             if crypt:
-                recv = json.loads(self.cfms_AES_decrypt(primary_data))
+                recv = json.loads(self.cfms_aes_decrypt(primary_data))
             else:
                 recv = json.loads(primary_data)
-            self.logger.debug(f"{'DEBUG:server response':*^30}" + '\n' + pprint.pformat(recv))
+            self.logger.debug(f"{'DEBUG:server response':*^50}" + '\n' + pprint.pformat(recv))
             return {"state": True, "recv": recv}
-        else: 
+        else:
             return None
-
 
     def __cfms_send(self, request, crypt: bool = True):
         json_obj = json.dumps(request)
-        self.logger.debug(f"{'DEBUG:client request':*^30}"+'\n'+pprint.pformat(request))
+        self.logger.debug(f"{'DEBUG:main_sock request':*^50}" + '\n' + pprint.pformat(request))
         if crypt:
-            self.client.sendall(self.cfms_AES_encrypt(json_obj))
+            self.main_sock.sendall(self.cfms_aes_encrypt(json_obj))
         else:
-            self.client.send(json_obj)
+            self.main_sock.send(json_obj)
         return True
 
-    def connect_cfms_server(self, host: str, port=DEFAULT_PORT) -> dict:
+    def connect_cfms_server(self, host: str, port: int =DEFAULT_PORT) -> dict:
         """连接到服务器"""
         public_key = None
         first_time_connection = False
         self.AEC_key = get_random_bytes(32)  # 生成对称加密密钥
-        self.client.setblocking(True)
+        self.main_sock.setblocking(True)
         try:
             self.pem_file = ClientPemFile(file_name=f"KEY_{host}_{port}")
-            self.client.connect((host, port))
-            self.client.sendall("hello".encode())
-            self.client.recv(1024)
-            self.client.sendall("enableEncryption".encode())
-            public_key = json.loads(self.client.recv(1024).decode(encoding="utf-8"))['public_key']
+            self.main_sock.connect((host, port))
+            self.main_sock.sendall("hello".encode())
+            self.main_sock.recv(1024)
+            self.main_sock.sendall("enableEncryption".encode())
+            public_key = json.loads(self.main_sock.recv(1024).decode(encoding="utf-8"))['public_key']
             local_key = self.pem_file.read_pem_file()
 
             if not local_key:
@@ -130,7 +139,7 @@ class CfmsClientSocket:
                 self.logger.info(f"The public key is \n {public_key}")
             elif public_key != local_key and not first_time_connection:
                 self.logger.warning(f"The public key of the server is \n {public_key}."
-                      f" \n But your public key is \n {local_key}.")
+                                    f" \n But your public key is \n {local_key}.")
                 return {"state": False,
                         "isSameKey": False,
                         "public_key": public_key}
@@ -139,18 +148,19 @@ class CfmsClientSocket:
             rsa_public_cipher = PKCS1_OAEP.new(rsa_public_key)
 
             encrypted_data = rsa_public_cipher.encrypt(self.AEC_key)  # 用公钥加密对称加密密钥
-            self.client.sendall(encrypted_data)  # 发送加密的对称加密密钥
+            self.main_sock.sendall(encrypted_data)  # 发送加密的对称加密密钥
 
-            server_response = json.loads(self.cfms_AES_decrypt(self.client.recv(1024)))
+            server_response = json.loads(self.cfms_aes_decrypt(self.main_sock.recv(1024)))
             if server_response['code'] == 0:
-                self._is_linked = True
-                self.ftp_host = host
+                self.is_linked = True
                 return {"clientState": True,
                         "address": (host, port),
                         "isFirstTimeConnection": first_time_connection,
                         "public_key": public_key}
-        except (TimeoutError, TypeError, ValueError, OSError, ConnectionRefusedError, ConnectionError) as e:
+        except (TimeoutError, OSError, ConnectionRefusedError, ConnectionError, ConnectionAbortedError) as e:
             self.reset_sock()
+            if isinstance(e, OSError):
+                e = e.args[1]
             return {"clientState": False,
                     "address": (host, port),
                     "isFirstTimeConnection": first_time_connection,
@@ -163,23 +173,21 @@ class CfmsClientSocket:
         account = {"username": user, "token": token}
         self.cfms_dict_to_send.setdefault("auth", {}).update(account)
 
-    def refresh_token(self, t: int = 3400):
-        while self._is_linked:
-            time.sleep(t)
-            recv = self.cfms_send_request(request="refreshToken")
-            if recv["state"]:
-                if recv["recv"]["code"] == 0:
-                    self.logger.info("Token has been refreshed successfully.")
-                elif recv["recv"]["code"] == 401:
-                    self.logger.error("Fail to refresh token. Old token is invalid.")
+    # def refresh_token(self, t: int = 3400):
+    #     while self._is_linked:
+    #         time.sleep(t)
+    #         self.cfms_send_request(request="refreshToken")
+    #         if recv["state"]:
+    #             if recv["recv"]["code"] == 0:
+    #                 self.logger.info("Token has been refreshed successfully.")
+    #             elif recv["recv"]["code"] == 401:
+    #                 self.logger.error("Fail to refresh token. Old token is invalid.")
 
     def cfms_send_request(self, request: str, data: dict = None):
-        print("sending...")
         try:
             to_send = self.cfms_dict_to_send.copy()
             to_send.update({"request": request, "data": data})
             self.__cfms_send(to_send)
-            print("done")
             return {"state": True}
         except (TimeoutError, TypeError, ValueError, OSError, ConnectionRefusedError, ConnectionError) as e:
             print(e)
@@ -187,51 +195,56 @@ class CfmsClientSocket:
 
     def reset_sock(self):
         """重置连接"""
-        self._is_linked = False
+        self.is_linked = False
         self.close_connection()
-        self.client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.client.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, True)
-        self.client.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, True)
+        self.main_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.main_sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, True)
+        self.main_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, True)
+        return
 
     def close_connection(self):
         """关闭连接"""
         to_send = {"version": 1, "request": "disconnect"}
         try:
-            if self._is_linked:
-                self._is_linked = False
-                self.client.settimeout(5)  # 若尝试安全关闭时超时，至多等待5s
+            self.main_sock.setblocking(True)
+            if self.is_linked:
+                self.is_linked = False
+                self.main_sock.settimeout(5)  # 若尝试安全关闭时超时，至多等待5s
                 self.__cfms_send(to_send)  # 可能抛出异常的位置
-                self.client.shutdown(2)
-            self.client.close()  # 释放socket
+                self.main_sock.shutdown(2)
+            self.main_sock.close()  # 释放socket
         except (TypeError, OSError, TimeoutError) as e:
-            self.client.close()
+            self.main_sock.close()
             self.logger.warning("Socket has been closed directly!", e)
         else:
             self.logger.info("Socket has been closed safely.")
+        return
 
 
 class ClientMainLoopThread(QThread):
-    def __init__(self, parent):
-        self.parent = parent
+    def __init__(self, target: CfmsClientSocket):
+        self.parent = target
         super().__init__()
 
-    @staticmethod
-    def main_loop(parent):
-        while True:
+    def refresh_token(self):
+        ...
+
+    def main_loop(self):
+        p = self.parent
+        while self.parent.is_linked:
             try:
-                if parent.requests:
-                    for index, request in enumerate(parent.requests):
-                        parent.cfms_send_request(request[0],request[1])
-                        del parent.requests[index]
+                if self.parent.requests:
+                    for index, request in enumerate(self.parent.requests):
+                        self.parent.cfms_send_request(request[0], request[1])
+                        del self.parent.requests[index]
             except Exception as e:
                 print(e)
-            data = parent.cfms_recvall()
+            data = p.cfms_recvall() # cfms_recvall 带0.001阻塞
             if data:
-                parent.responses.append(data)
-            time.sleep(0.01)
+                self.parent.responses.append(data)
 
     def run(self):
-        self.main_loop(self.parent)
+        self.main_loop()
 
 
 class ClientSubThread(QThread, CfmsClientSocket):
@@ -242,27 +255,28 @@ class ClientSubThread(QThread, CfmsClientSocket):
     REQUEST = 2
     CONNECT = 0
 
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
         super(ClientSubThread, self).__init__()
-        self.sub_thread_args = None
+        self._sub_thread_args = args
+        self._sub_thread_kwargs = kwargs
         self.sub_thread_action = None
         self.loaded = False
+        self.__mainloop = ClientMainLoopThread(target=self)
 
     def load_sub_thread(self, action: int = 2, *args, **kwargs):
         self.sub_thread_action = action
-        self.sub_thread_kwargs = kwargs
-        self.sub_thread_args = args
+        self._sub_thread_kwargs = kwargs
+        self._sub_thread_args = args
         self.loaded = True
 
     def start_loop(self):
-        print("start listening...")
-        self.__mainloop = ClientMainLoopThread(self)
+        # print("start listening...")
         self.__mainloop.start()
 
     def run(self):
         if self.loaded:
             if self.sub_thread_action == 0:
-                address = self.sub_thread_kwargs["address"]
+                address = self._sub_thread_kwargs["address"]
                 tran_address = (str(address[0]), int(address[1]))
                 data = self.connect_cfms_server(*tran_address)
                 self.signal.emit(data)
@@ -270,12 +284,14 @@ class ClientSubThread(QThread, CfmsClientSocket):
             elif self.sub_thread_action == 2:
                 # data = self._cfms_send_request(request=self.sub_thread_kwargs["request"],
                 #                                  data=self.sub_thread_kwargs.setdefault("data", {}))
-                self.requests.append((self.sub_thread_kwargs["request"], self.sub_thread_kwargs.setdefault("data", {})))
+                self.requests.append(
+                    (self._sub_thread_kwargs["request"], self._sub_thread_kwargs.setdefault("data", {}))
+                )
                 t = 0
-                while t<=1000:
-                    t+=1
+                while t <= 1000:
+                    t += 1
                     if self.responses:
-                        if data:=self.responses.pop(0):
+                        if data := self.responses.pop(0):
                             break
                     else:
                         time.sleep(0.01)
@@ -283,13 +299,12 @@ class ClientSubThread(QThread, CfmsClientSocket):
                     data = {"state": False, "error": "time out"}
                     self.signal.emit(data)
                     return
-                print("done")
-                data["extra"] = self.sub_thread_kwargs.get("extra", None)
+                data["extra"] = self._sub_thread_kwargs.get("extra", None)
                 self.logger.debug(pprint.pformat(data))
                 self.signal.emit(data)
 
-            elif self.sub_thread_action == 3:
-                self.refresh_token()
+            # elif self.sub_thread_action == 3:
+            #     self.refresh_token()
 
         else:
             raise ValueError
@@ -309,12 +324,17 @@ class ClientFtpTask(QThread):
         self._loaded = False
         self._thread_run = True
         self._ftp_address = address
+
         self.task_mode = mode
         self.task_uuid = task_uuid
-        self.state = 1
         self.setObjectName(f"FtpTask-'{self.task_uuid}'")
+
+        self.state = 1
+
         self.ftp_obj = ftplib.FTP_TLS()
         self.ftp_obj.debug(0)
+
+        self._progress_thread = threading.Thread(target=lambda: self.get_transport_progress(self._task_fileio))
 
     def __str__(self):
         return self.task_info
@@ -328,34 +348,34 @@ class ClientFtpTask(QThread):
 
     def load_task(self, _task_id, _task_token, task_fileio: FtpFilesManager, file_name=None):
         self._loaded = True
-        self.task_id = _task_id
-        self.task_token = _task_token
-        self.task_fileio = task_fileio
-        self.ftp_fake_file_name = file_name
-        self._progress_thread = threading.Thread(target=lambda: self.get_transport_progress(self.task_fileio))
+        self._task_id = _task_id
+        self._task_token = _task_token
+        self._task_fileio = task_fileio
+        self._ftp_fake_file_name = file_name
 
-    def connect(self, _result_signal=None, _progress_signal=None):
-        for i in range(2):
-            try:
-                self.__ftp_signal.connect(_result_signal)
-                self.__ftp_progress_signal.connect(_progress_signal)
-            except TypeError:
-                continue
+    def connector(self, result_func=None, progress_func=None):
+        try:
+            self.__ftp_signal.connect(result_func)
+        except TypeError:
+            pass
+        try:
+            self.__ftp_progress_signal.connect(progress_func)
+        except TypeError:
+            pass
 
     def task_transform(self):
         try:
-            self.ftp_obj.debug(2)
             self.ftp_obj.connect(*self._ftp_address)
-            self.ftp_obj.login(user=self.task_id, passwd=self.task_token)
+            self.ftp_obj.login(user=self._task_id, passwd=self._task_token)
             self.ftp_obj.prot_p()
             self._progress_thread.start()
             if self.task_mode == "DOWNLOAD_FILE":
-                sock = self.ftp_obj.transfercmd(cmd=f"RETR {self.ftp_fake_file_name}", rest=None)
-                self.task_fileio.write_file(sock)
+                sock = self.ftp_obj.transfercmd(cmd=f"RETR {self._ftp_fake_file_name}", rest=None)
+                self._task_fileio.write_file(sock)
 
             elif self.task_mode == "UPLOAD_FILE":
-                sock = self.ftp_obj.transfercmd(cmd=f"STOR {self.ftp_fake_file_name}", rest=None)
-                self.task_fileio.read_file(sock)
+                sock = self.ftp_obj.transfercmd(cmd=f"STOR {self._ftp_fake_file_name}", rest=None)
+                self._task_fileio.read_file(sock)
             self._thread_run = False
             self.ftp_obj.voidresp()
             self.ftp_obj.quit()
@@ -387,22 +407,19 @@ class ClientFtpTask(QThread):
                 pass
             last_bytes = current_bytes
             progress = round(100 * current_bytes / file_io.file_size, 2)
-            self.__ftp_progress_signal.emit((progress, speed))
+            # self.ftp_progress_signal.emit((progress, speed))
 
             tar2 = tar0
             time.sleep(0.1)
             tar1 = time.perf_counter()
-        try:
-            self.__ftp_progress_signal.disconnect()
-        except TypeError:
-            ...
+        # try:
+            # self.ftp_progress_signal.disconnect()
+        # except TypeError:
+        #     pass
 
     def run(self):
         if not self._loaded:
             raise ValueError
         recv = self.task_transform()
         self.__ftp_signal.emit(recv)
-        try:
-            self.__ftp_signal.disconnect()
-        except TypeError:
-            ...
+        return
