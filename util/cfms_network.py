@@ -7,6 +7,7 @@
 import ftplib
 import json
 import pprint
+import secrets
 import socket
 import ssl
 import threading
@@ -108,6 +109,8 @@ class CfmsClientSocket:
             return None
 
     def __cfms_send(self, request, crypt: bool = True):
+        request["X-Ca-Timestamp"] = time.time()
+        request["trace_id"] = secrets.token_hex(16)
         json_obj = json.dumps(request)
         self.logger.debug(f"{'DEBUG:main_sock request':*^50}" + '\n' + pprint.pformat(request))
         if crypt:
