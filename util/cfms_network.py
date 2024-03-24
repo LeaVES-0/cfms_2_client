@@ -60,12 +60,12 @@ class CfmsClientSocket:
         iv = aes_cipher.iv
         return iv + encrypted_data
 
-    def cfms_aes_decrypt(self, data):
+    def cfms_aes_decrypt(self, data, decode=True):
         """AES解密"""
         iv = data[:16]
         aes_cipher = AES.new(self.AEC_key, AES.MODE_CBC, iv=iv)  # 生成对称加密密钥对象CBC
         decrypted_data = unpad(aes_cipher.decrypt(data[16:]), AES.block_size)
-        return decrypted_data.decode()
+        return decrypted_data.decode() if decode else decrypted_data
 
     def cfms_recvall(self, crypt: bool = True):
         """
@@ -131,35 +131,75 @@ class CfmsClientSocket:
             self.main_sock.sendall("hello".encode())
             self.main_sock.recv(1024)
             self.main_sock.sendall("enableEncryption".encode())
-            public_key = json.loads(self.main_sock.recv(1024).decode(encoding="utf-8"))['public_key']
-            local_key = self.pem_file.read_pem_file()
 
-            if not local_key:
-                self.pem_file.write_pem_file(pem_content=public_key)
-                self.logger.info("It's the first time to link this server.")
-                first_time_connection = True
-            if public_key == local_key:
-                self.logger.info(f"The public key is \n {public_key}")
-            elif public_key != local_key and not first_time_connection:
-                self.logger.warning(f"The public key of the server is \n {public_key}."
-                                    f" \n But your public key is \n {local_key}.")
-                return {"state": False,
-                        "isSameKey": False,
-                        "public_key": public_key}
+            received_msg = json.loads(self.main_sock.recv(1024).decode(encoding="utf-8"))
 
-            rsa_public_key = RSA.import_key(public_key)
-            rsa_public_cipher = PKCS1_OAEP.new(rsa_public_key)
+            if crypt_method:=received_msg["method"] == "x25519":
+                from cryptography.hazmat.primitives import hashes
+                from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey, X25519PublicKey
+                from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
-            encrypted_data = rsa_public_cipher.encrypt(self.AEC_key)  # 用公钥加密对称加密密钥
-            self.main_sock.sendall(encrypted_data)  # 发送加密的对称加密密钥
+                # 客户端随机生成私钥
+                self_x25519_private_key = X25519PrivateKey.generate()
+                self_x_public_key = self_x25519_private_key.public_key()
 
-            server_response = json.loads(self.cfms_aes_decrypt(self.main_sock.recv(1024)))
-            if server_response['code'] == 0:
-                self.is_linked = True
-                return {"clientState": True,
-                        "address": (host, port),
-                        "isFirstTimeConnection": first_time_connection,
-                        "public_key": public_key}
+                peer_public_key = X25519PublicKey.from_public_bytes(bytes.fromhex(received_msg['public_key']))
+                
+                self.main_sock.sendall(self_x_public_key.public_bytes_raw())
+                shared_key: bytes = self_x25519_private_key.exchange(peer_public_key) # 得到共享密钥
+
+                self.AEC_key = shared_key
+
+                encrypted_data_25519 = self.main_sock.recv(1024)
+                self.AEC_key = bytes.fromhex(self.cfms_aes_decrypt(encrypted_data_25519)) # 得到导出密钥
+
+                self.cfms_send_request("encrypt_test") # 发送内容任意的加密数据，供服务器确认状况
+
+                server_response = json.loads(self.cfms_aes_decrypt(self.main_sock.recv(1024)))
+                if server_response['code'] == 0:
+                    self.is_linked = True
+                    return {"clientState": True,
+                            "address": (host, port),
+                            "isFirstTimeConnection": first_time_connection,
+                            "public_key": public_key}
+
+            elif crypt_method == "rsa":
+
+                public_key = json.loads(self.main_sock.recv(1024).decode(encoding="utf-8"))['public_key']
+                local_key = self.pem_file.read_pem_file()
+
+                if not local_key:
+                    self.pem_file.write_pem_file(pem_content=public_key)
+                    self.logger.info("It's the first time to link this server.")
+                    first_time_connection = True
+                if public_key == local_key:
+                    self.logger.info(f"The public key is \n {public_key}")
+                elif public_key != local_key and not first_time_connection:
+                    self.logger.warning(f"The public key of the server is \n {public_key}."
+                                        f" \n But your public key is \n {local_key}.")
+                    return {"clientState": False,
+                            "isSameKey": False,
+                            "address": (host, port),
+                            "public_key": public_key}
+
+                rsa_public_key = RSA.import_key(public_key)
+                rsa_public_cipher = PKCS1_OAEP.new(rsa_public_key)
+
+                encrypted_data = rsa_public_cipher.encrypt(self.AEC_key)  # 用公钥加密对称加密密钥
+                self.main_sock.sendall(encrypted_data)  # 发送加密的对称加密密钥
+
+                server_response = json.loads(self.cfms_aes_decrypt(self.main_sock.recv(1024)))
+                if server_response['code'] == 0:
+                    self.is_linked = True
+                    return {"clientState": True,
+                            "address": (host, port),
+                            "isFirstTimeConnection": first_time_connection,
+                            "public_key": public_key}
+                
+            else:
+                raise NotImplementedError(f"Crypto method {crypt_method} is not supported")
+                
+
         except (TimeoutError, OSError, ConnectionRefusedError, ConnectionError, ConnectionAbortedError) as e:
             self.reset_sock()
             if isinstance(e, OSError):
